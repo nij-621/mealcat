@@ -3,3 +3,4 @@ import.json
 *.zip
 mealcat-*.json
 .icon-src.html
+legacy-weeks.json

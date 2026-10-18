@@ -212,7 +212,7 @@ function weekStats(mon) {
     if (sl.a?.s === 'changed') r.changed++;
     if (sl.a?.s === 'out') r.out++;
     if (sl.h != null) r.split++;
-    if (s < today && sl.p && !sl.a) r.miss++;
+    if (s < today && sl.p && !sl.a && !w.legacy) r.miss++;
   }
   return r;
 }
@@ -236,7 +236,7 @@ function vWeek() {
       <div class="big" style="font-size:28px">${rangeL(mon)}</div></div>
     <div class="wk-btns"><button class="icon-btn pen" data-a="share-him" aria-label="${t('남편에게 공유', 'Share')}">${ic('i-share')}</button>
       <button class="prep-btn pen" data-a="prep">${ic('daisy')}${t('다음 주 준비', 'Next week')}${art('cat-peek', 'peek')}</button></div></div>
-  <div class="wk-stat">${statLine(mon)}</div>`;
+  <div class="wk-stat">${w?.legacy ? t('메모앱에서 옮긴 계획 · ', 'Plan from my notes app · ') : ''}${statLine(mon)}</div>`;
   if (!weekStats(mon).plans) {
     const prev = weekStats(addDays(mon, -7)).plans;
     h += `<div class="empty-week pen dash">${art('cat-sleep')}<div><p>${t('칸을 눌러 메뉴를 적어요.', 'Tap a slot to write a dish.')}</p>
@@ -246,7 +246,7 @@ function vWeek() {
   for (const s of weekDays(mon)) {
     const d = w?.days[s]; const sn = d?.snacks?.length || 0;
     h += `<div class="wk-row${s === today ? ' today' : ''}"><div class="wk-day"><b>${dow(s)}</b><small>${parse(s).getDate()}</small>${sn ? `<small class="sn">${ic('cookie')}${sn}</small>` : ''}</div>`;
-    for (const k of slotsOf(s)) h += cell(s, k, d?.slots[k], s < today);
+    for (const k of slotsOf(s)) h += cell(s, k, d?.slots[k], s < today && !w?.legacy);
     h += `</div>`;
   }
   if (w?.preps.length) h += `<div class="mp pen"><b>${t('밀프랩', 'Meal prep')}</b><span>${w.preps.map(p => `${prepL(p.type)} ${esc(m(p.name))} ${Math.max(0, prepLeft(w, p.id))}/${p.count}`).join(' · ')}</span></div>`;
@@ -330,8 +330,9 @@ function vHistory() {
   for (const mon of mons) {
     const w = state.weeks[mon]; const pics = [];
     for (const s of weekDays(mon)) { const d = w.days[s]; const sl = d && slotsOf(s).map(k => d.slots[k]).find(x => x?.a?.photo); pics.push(sl ? sl.a.photo : null); }
-    h += `<button class="hist pen" data-a="go-week" data-v="${mon}"><b>${rangeL(mon)}</b><div class="meta">${statLine(mon)}</div>
-      <div class="strip">${pics.map(p => `<span>${p ? pimg(p) : ''}</span>`).join('')}</div></button>`;
+    h += `<button class="hist pen" data-a="go-week" data-v="${mon}"><b>${rangeL(mon)} <span class="muted small">${parse(mon).getFullYear()}</span></b><div class="meta">${w.legacy ? t('메모앱 기록', 'From notes app') : statLine(mon)}</div>
+      ${pics.some(Boolean) || !w.legacy ? `<div class="strip">${pics.map(p => `<span>${p ? pimg(p) : ''}</span>`).join('')}</div>`
+        : `<div class="dinners pn">${weekDays(mon).map(s => w.days[s]?.slots.D?.p).filter(Boolean).map(n => esc(m(n))).join(' · ')}</div>`}</button>`;
   }
   return h;
 }
@@ -719,6 +720,18 @@ function mergeMenus(dst, src) {
 }
 async function importFile(file) {
   let j; try { j = JSON.parse(await file.text()); } catch { toast(t('JSON 파일이 아니에요', 'Not a JSON file')); return; }
+  if (j.legacy_weeks) {
+    // 메모앱 옛 식단: 이미 있는 주·날은 건드리지 않고 빈 곳만 채움
+    let weeks = 0, days = 0;
+    for (const [mon, lw] of Object.entries(j.legacy_weeks)) {
+      const w = state.weeks[mon];
+      if (!w) { state.weeks[mon] = lw; weeks++; days += Object.keys(lw.days).length; continue; }
+      for (const [s, d] of Object.entries(lw.days)) if (!w.days[s] || !Object.keys(w.days[s].slots).length) { w.days[s] = d; days++; }
+      if (lw.memo && !w.memo.includes(lw.memo)) w.memo = (w.memo ? w.memo + '\n' : '') + lw.memo;
+    }
+    await flush(); closeSheet(); render();
+    toast(t(`옛 식단 ${weeks}주 · ${days}일을 넣었어요`, `Added ${weeks} weeks · ${days} days of old plans`)); return;
+  }
   if (j.weeks) { await restoreState(j, []); return; }
   if (!j.menus && !j.recipes) { toast(t('import.json 형식이 아니에요', 'Not an import.json')); return; }
   const M = j.menus || {};
