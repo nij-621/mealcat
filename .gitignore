@@ -1,0 +1,5 @@
+# 개인 데이터는 리포에 넣지 않음 — import.json·백업은 앱에서 파일로 불러옴
+import.json
+*.zip
+mealcat-*.json
+.icon-src.html
