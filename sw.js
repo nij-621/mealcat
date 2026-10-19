@@ -1,5 +1,5 @@
 // Mealcat SW — network first (updates land right away), cache fallback for offline
-const CACHE = 'mealcat-v2';
+const CACHE = 'mealcat-v3';
 const SHELL = ['./', './index.html', './style.css', './app.js', './zip.js', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

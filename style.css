@@ -244,6 +244,9 @@ textarea.mono{font:13.5px/1.5 var(--body);letter-spacing:0}
 .rcard .st{margin-left:auto;flex:none}
 .item{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 4px 4px 12px;border-radius:14px;margin-bottom:6px;width:100%}
 .item .nm{font:700 17px var(--pen);letter-spacing:var(--pen-track)}
+.item button.nm{display:inline-flex;align-items:center;gap:5px;min-height:40px;text-align:left}
+.item button.nm .dd,.ren .dd{width:15px;height:15px}
+.ren{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;margin:-8px 0;vertical-align:middle}
 .item .n{margin-left:auto;font-size:12px;color:var(--pencil)}
 .rdet h4{font:400 15px var(--display);margin:16px 0 6px}
 .rdet ul,.rdet ol{margin:0;padding-left:20px;line-height:1.65;font-size:15px}
@@ -254,6 +257,45 @@ textarea.mono{font:13.5px/1.5 var(--body);letter-spacing:0}
 .welcome h2{font:400 22px var(--display);margin:0 0 6px}
 .welcome p{margin:0 0 12px;font-size:14px;line-height:1.6;color:#5d5855}
 .welcome .dd{width:80px;height:auto;float:right;margin:-6px -4px 0 8px}
+
+/* ── 냉장고 ── */
+.seg.three{grid-template-columns:repeat(3,1fr)}
+.fr-sum{font-size:12.5px;color:var(--pencil);margin:-2px 0 10px;line-height:1.5}
+.fr-link{display:flex;align-items:center;gap:6px;width:100%;margin-top:9px;padding:9px 12px;border-radius:14px;font:400 14px var(--display);text-align:left}
+.fr-link .dd{width:22px;height:22px}
+.fr-link em{margin-left:auto;font-style:normal;color:var(--pencil);font-size:13px}
+.fr{display:flex;align-items:center;gap:8px;min-height:42px;border-bottom:1.3px dashed var(--line)}
+.fr > .dd{width:24px;height:24px}
+.fr .nm{font:700 18px/1 var(--pen);letter-spacing:var(--pen-track);text-align:left;min-height:40px;min-width:0;overflow-wrap:anywhere}
+.fr .q{font-size:12px;color:var(--pencil);white-space:nowrap}
+.fr .d{margin-left:auto;font-size:12.5px;color:var(--pencil);white-space:nowrap}
+.fr .d.hot{color:var(--ink);background:linear-gradient(transparent 55%,var(--blush) 55% 92%,transparent 92%);font:400 13px var(--display)}
+.fr .ck{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none;transition:transform 160ms var(--ease-out),background-color 160ms ease}
+.fr .ck:active{transform:scale(.9)}
+.fr .ck .dd{width:15px;height:15px;stroke:var(--line)}
+.fr.used .nm{text-decoration:line-through;color:var(--pencil)}
+.fr.used .ck{background:var(--ink)}
+.fr.used .ck .dd{stroke:#fff}
+.gone-box{border-radius:16px;padding:8px 12px 10px;margin-top:14px}
+.gone-row{display:flex;align-items:center;gap:8px;min-height:38px;color:var(--pencil)}
+.gone-row .nm{font:700 17px var(--pen);letter-spacing:var(--pen-track)}
+.gone-row .ghost{height:30px;padding:0 10px;font-size:12.5px;margin-left:auto}
+.parse{font-size:12.5px;color:var(--pencil);margin-top:8px;line-height:1.6}
+.parse mark{background:linear-gradient(transparent 58%,var(--blush) 58% 92%,transparent 92%);color:var(--ink);font:700 14.5px var(--pen);letter-spacing:var(--pen-track);padding:0 1px}
+.use-first{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.use-first span{display:inline-flex;align-items:center;gap:3px;height:32px;padding:0 10px 0 6px;border-radius:99px;font:700 16px var(--pen);letter-spacing:var(--pen-track)}
+.use-first span .dd{width:20px;height:20px}
+.use-first small{font:400 11.5px var(--display);color:var(--pencil);letter-spacing:0;margin-left:2px}
+.rcard .fm{display:block;font-size:12px;color:var(--ink);margin-top:3px}
+.rcard .fm u{text-decoration:none;background:linear-gradient(transparent 58%,var(--blush) 58% 92%,transparent 92%)}
+.big-q{display:flex;gap:7px;margin-top:12px}
+.big-q .field{flex:1;margin:0;min-width:0}
+.big-q .field.q{flex:0 0 96px}
+.big-q .field input{width:100%}
+.shelf{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.shelf button{height:38px;border-radius:12px;font:400 13.5px var(--display)}
+.shelf button.on{background:var(--ink);color:#fff}
+.shelf button.on::before{display:none}
 
 /* ── 설정 ── */
 .set-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0;border-bottom:1.4px dashed var(--line)}
@@ -266,8 +308,8 @@ textarea.mono{font:13.5px/1.5 var(--body);letter-spacing:0}
 .names input{width:84px;height:36px;border-radius:10px;border:1.5px solid var(--line);padding:0 8px;font-size:15px}
 
 /* ── 토스트 ── */
-#toast{position:fixed;left:50%;bottom:calc(var(--tabs-h) + var(--safe-b) + 14px);transform:translate(-50%,12px);background:var(--ink);color:#fff;font:400 14px var(--display);padding:10px 16px;border-radius:99px;opacity:0;pointer-events:none;transition:opacity 200ms ease,transform 200ms var(--ease-out);z-index:60;max-width:calc(100vw - 32px);text-align:center}
-#toast.in{opacity:1;transform:translate(-50%,0)}
+div#toast{position:fixed;left:50%;bottom:calc(var(--tabs-h) + var(--safe-b) + 14px);transform:translate(-50%,12px);background:var(--ink);color:#fff;font:400 14px var(--display);padding:10px 16px;border-radius:99px;opacity:0;pointer-events:none;transition:opacity 200ms ease,transform 200ms var(--ease-out);z-index:60;max-width:calc(100vw - 32px);text-align:center}
+div#toast.in{opacity:1;transform:translate(-50%,0)}
 
 @media (prefers-reduced-motion:reduce){
   .sheet{transition:none}
