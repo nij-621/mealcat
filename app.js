@@ -18,7 +18,8 @@ const todayStr = () => ymd(new Date());
 const mondayOf = s => { const d = parse(s); const w = (d.getDay() + 6) % 7; d.setDate(d.getDate() - w); return ymd(d); };
 const weekDays = mon => [0, 1, 2, 3, 4, 5, 6].map(i => addDays(mon, i));
 const isWeekend = s => [0, 6].includes(parse(s).getDay());
-const slotsOf = s => isWeekend(s) ? ['BR', 'D'] : ['B', 'L', 'D'];
+const isTwo = s => isWeekend(s) || !!state.weeks[mondayOf(s)]?.days[s]?.two; // 주말 또는 2끼 날(휴일·휴가)
+const slotsOf = s => isTwo(s) ? ['BR', 'D'] : ['B', 'L', 'D'];
 const hhmm = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 
 /* ───────── 언어 ───────── */
@@ -246,30 +247,33 @@ function vWeek() {
   h += `<div class="wk-cols"><span></span><span>${t('아침', 'Breakfast')}</span><span>${t('점심', 'Lunch')}</span><span>${t('저녁', 'Dinner')}</span></div>`;
   for (const s of weekDays(mon)) {
     const d = w?.days[s]; const sn = d?.snacks?.length || 0;
-    h += `<div class="wk-row${s === today ? ' today' : ''}"><div class="wk-day"><b>${dow(s)}</b><small>${parse(s).getDate()}</small>${sn ? `<small class="sn">${ic('cookie')}${sn}</small>` : ''}</div>`;
+    const dayIn = `<b>${dow(s)}</b><small>${parse(s).getDate()}</small>${d?.two ? `<small class="two">${t('2끼', '2 meals')}</small>` : ''}${sn ? `<small class="sn">${ic('cookie')}${sn}</small>` : ''}`;
+    h += `<div class="wk-row${s === today ? ' today' : ''}">${isWeekend(s) ? `<div class="wk-day">${dayIn}</div>` : `<button class="wk-day" data-a="two" data-v="${s}" aria-label="${dowL(s)} · ${d?.two ? t('3끼로 돌리기', 'Back to 3 meals') : t('2끼 날로 바꾸기', 'Make it a 2-meal day')}">${dayIn}</button>`}`;
     for (const k of slotsOf(s)) h += cell(s, k, d?.slots[k], s < today && !w?.legacy);
     h += `</div>`;
   }
+  h += `<div class="wk-hint">${t('평일 요일을 누르면 2끼 날(브런치·저녁)로 바뀌어요', 'Tap a weekday to make it a 2-meal day (brunch + dinner)')}</div>`;
   if (w?.preps.length) h += `<div class="mp pen"><b>${t('밀프랩', 'Meal prep')}</b><span>${w.preps.map(p => `${prepL(p.type)} ${esc(m(p.name))} ${Math.max(0, prepLeft(w, p.id))}/${p.count}`).join(' · ')}</span></div>`;
   return h;
 }
 function cell(s, k, sl, past) {
   const span = k === 'BR' ? ' span' : '';
   const attrs = `data-a="pick" data-d="${s}" data-k="${k}"`;
-  const lab = k === 'BR' || (isWeekend(s) && k === 'D') ? `<span class="slot">${slotL(k)}</span>` : '';
+  const lab = k === 'BR' || (isTwo(s) && k === 'D') ? `<span class="slot">${slotL(k)}</span>` : '';
   sl = sl || {};
   if (sl.a?.photo) {
     const b = sl.a.s === 'changed' ? `<span class="badge">${t('바꿈', 'Changed')}</span>` : sl.a.s === 'out' ? `<span class="badge out">${t('외식', 'Out')}</span>` : '';
     return `<button class="cell pen photo${span}" ${attrs} aria-label="${esc(sl.a.s === 'out' ? outL(sl.a) : m(sl.a.m || sl.p))}">${pimg(sl.a.photo)}${b}</button>`;
   }
-  if (sl.h != null) return `<button class="cell pen split${span}" ${attrs}><span class="half">${ic('me', 'av')}<span class="nm">${esc(m(sl.p)) || '—'}</span></span><span class="half">${ic('him', 'av')}<span class="nm">${esc(m(sl.h)) || '—'}</span></span></button>`;
+  if (sl.h != null) return `<button class="cell pen split${span}" ${attrs}><span class="half">${ic('me', 'av')}<span class="nm">${esc(m(sl.p)) || '—'}</span></span><span class="half">${ic('him', 'av')}<span class="nm">${esc(m(sl.h)) || '—'}</span></span>${sl.n ? `<span class="memo">${esc(sl.n)}</span>` : ''}</button>`;
   const pr = prepOf(s, sl.pp);
   const name = sl.a?.s ? (sl.a.s === 'out' ? OUT : sl.a.m || sl.p) : sl.p;
-  if (!name) return `<button class="cell pen soft empty${span}" ${attrs} aria-label="${slotL(k)}">${lab}<span class="nm">+</span></button>`;
+  const memo = sl.n ? `<span class="memo">${esc(sl.n)}</span>` : '';
+  if (!name) return `<button class="cell pen soft empty${span}" ${attrs} aria-label="${slotL(k)}">${lab}<span class="nm">+</span>${memo}</button>`;
   const miss = past && !sl.a;
   const out = name === OUT;
   return `<button class="cell pen${span}${miss ? ' miss' : ''}${out ? ' dash' : ''}" ${attrs}>${pr ? `<span class="prep">${prepL(pr.type)}</span>` : lab}<span class="nm">${esc(out ? outL(sl.a) : m(name))}</span>
-    ${miss ? `<span class="note">${t('기록 없음', 'Not logged')}</span>` : ''}${sl.a?.s ? ic('i-check', 'ok') : ''}</button>`;
+    ${memo}${miss ? `<span class="note">${t('기록 없음', 'Not logged')}</span>` : ''}${sl.a?.s ? ic('i-check', 'ok') : ''}</button>`;
 }
 
 /* 다음 주 준비 */
@@ -539,6 +543,7 @@ function shPick() {
   if (!actual) {
     h += `<div class="seg pen"><button class="${split ? '' : 'on'}" data-a="split" data-v="0">${t('같이 먹어요', 'Together')}</button><button class="${split ? 'on' : ''}" data-a="split" data-v="1">${t('따로 먹어요', 'Separately')}</button></div>`;
     if (split) h += `<div class="who">${['me', 'him'].map(who => `<button class="pen${P.side === who ? ' on' : ''}" data-a="side" data-v="${who}">${ic(who, 'av')}<span><b>${esc(state.names[who])}</b><small>${esc(m(planName(sl, who))) || '—'}</small></span></button>`).join('')}</div>`;
+    h += `<div class="field pen memo-f">${ic('i-pen')}<input data-in="slot-note" value="${esc(sl.n || '')}" placeholder="${t('메모 — 칸 아래 작게 보여요', 'Note — shown small under the dish')}" maxlength="40" enterkeyhint="done"></div>`;
     if (s <= todayStr()) h += `<div class="pick-actual">${ic('i-cam', 'p')}<button class="today-link" data-a="goto-day" data-v="${s}">${t('이 날 기록하러 가기', 'Log this day')}</button></div>`;
   }
   if (k === 'B') {
@@ -720,7 +725,15 @@ function shAsk() {
 
 /* ───────── 동작 ───────── */
 let timer;
-function toast(msg) { const el = $('#toast'); el.textContent = msg; el.classList.add('in'); clearTimeout(timer); timer = setTimeout(() => el.classList.remove('in'), 2200); }
+// 클립보드가 막히면(iOS에서 가끔) 옛 방식으로 한 번 더
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { }
+  const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;opacity:0';
+  document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+  let ok = false; try { ok = document.execCommand('copy'); } catch { } ta.remove(); return ok;
+}
+async function copyToast(text, msg) { toast(await copyText(text) ? msg : t('복사가 안 됐어요 · 다시 눌러 보세요', 'Couldn’t copy · try again')); }
+function toast(msg) { const el = $('#toast-bar'); el.textContent = msg; el.classList.add('in'); clearTimeout(timer); timer = setTimeout(() => el.classList.remove('in'), 2200); }
 let camTarget = null;
 
 const A = {
@@ -733,7 +746,7 @@ const A = {
   'goto-day': v => { closeSheet(); S.tab = 'today'; S.day = v; scrollTo(0, 0); render(); },
   mt: v => { S.mt = v; render(); },
   rf: v => { S.rf = v; render(); },
-  close: () => { if (S.sheet?.type === 'ask' && askResolve) { askResolve(null); askResolve = null; } closeSheet(); },
+  close: () => { const pick = S.sheet?.type === 'pick'; if (S.sheet?.type === 'ask' && askResolve) { askResolve(null); askResolve = null; } closeSheet(); if (pick) render(); },
 
   pick: (v, el) => openSheet({ type: 'pick', date: el.dataset.d, k: el.dataset.k, mode: el.dataset.mode || 'plan', side: 'me', q: '', base: null, fruits: [] }),
   split: v => {
@@ -750,6 +763,17 @@ const A = {
     if (v !== OUT || P.mode !== 'actual') return choose(v);
     const o = await outNote(getSlot(P.date, P.k, false)?.a?.o); if (o == null) return;
     choose(v, null, P, o);
+  },
+  two: v => {
+    if (isWeekend(v)) return;
+    const d = getDay(v), on = !d.two, gone = on ? ['B', 'L'] : ['BR'];
+    const used = gone.map(k => d.slots[k]).filter(sl => sl && (sl.p || sl.h != null || sl.a || sl.n));
+    if (used.some(sl => sl.a)) { toast(t('이미 기록한 끼니가 있어서 바꿀 수 없어요', 'A meal here is already logged, so it can’t change')); return; }
+    if (used.length && !confirm(on ? t(`${dowL(v)} 아침·점심 계획을 지우고 2끼(브런치·저녁)로 바꿀까요?`, `Clear ${dowL(v)}’s breakfast and lunch plans and make it 2 meals?`)
+      : t(`${dowL(v)} 브런치 계획을 지우고 3끼로 돌릴까요?`, `Clear ${dowL(v)}’s brunch plan and go back to 3 meals?`))) return;
+    for (const k of gone) delete d.slots[k];
+    if (on) d.two = true; else delete d.two;
+    save(); render(); toast(on ? t(`${dowL(v)}은 2끼 날이에요`, `${dowL(v)} is a 2-meal day`) : t(`${dowL(v)} 3끼로 돌렸어요`, `${dowL(v)} is back to 3 meals`));
   },
   'choose-prep': v => { const P = S.sheet; const p = prepOf(P.date, v); if (p) choose(p.name, p.id); },
   'clear-slot': () => {
@@ -808,6 +832,7 @@ const A = {
   },
   'send-coach': () => sendCoach(S.weekOf),
   'share-him': () => shareHim(S.weekOf),
+  'wait-poke': () => waitPoke(),
 
   'menu-add': async v => { const n = (await ask(t('메뉴 이름', 'Dish name'), ''))?.trim(); if (!n) return; if (!state.menus[v].some(x => x.name === n)) state.menus[v].push({ name: n, n: 0 }); buildIndex(); save(); render(); },
   'menu-ren': async v => {
@@ -823,7 +848,7 @@ const A = {
   },
   'menu-del': (v, el) => { if (!confirm(t(`${v}을(를) 목록에서 뺄까요?`, `Remove ${v}?`))) return; const k = el.dataset.k; state.menus[k] = state.menus[k].filter(x => x.name !== v); buildIndex(); save(); render(); },
   recipe: v => openSheet({ type: 'recipe', id: v }),
-  'recipe-copy': async v => { const r = state.recipes.find(x => x.id === v); if (r) { await navigator.clipboard?.writeText(recipeText(r)); toast(t('복사했어요', 'Copied')); } },
+  'recipe-copy': v => { const r = state.recipes.find(x => x.id === v); if (r) copyToast(recipeText(r), t('복사했어요', 'Copied')); },
   'recipe-del': v => { const r = state.recipes.find(x => x.id === v); if (!r || !confirm(t(`${r.name} 카드를 지울까요?`, `Delete ${r.name}?`))) return; state.recipes = state.recipes.filter(x => x.id !== v); if (r.photo) photoDel(r.photo); buildIndex(); save(); closeSheet(); render(); },
   radd: () => openSheet({ type: 'radd', mode: 'paste', cats: [], photo: null }),
   'radd-mode': v => { S.sheet.mode = v; renderSheet(); },
@@ -874,7 +899,7 @@ const A = {
 
   settings: () => { openSheet({ type: 'settings' }); storageInfo(); },
   lang: v => { state.lang = v; save(); render(); },
-  'coach-copy': async () => { await navigator.clipboard?.writeText(COACH); toast(t('지침을 복사했어요', 'Instructions copied')); },
+  'coach-copy': () => copyToast(COACH, t('지침을 복사했어요 · 프로젝트에 붙여 넣으세요', 'Instructions copied · paste them into the project')),
   import: () => pickFile('.json,application/json', importFile),
   'legacy-del': () => {
     const mons = legacyWeeks(); if (!confirm(t(`메모앱에서 옮긴 ${mons.length}주를 지울까요? 메뉴 목록은 그대로예요.`, `Remove ${mons.length} weeks from the notes app? Your menu list stays.`))) return;
@@ -900,6 +925,7 @@ document.addEventListener('input', e => {
   if (k === 'memo') { getWeek(el.dataset.v).memo = el.value; save(); const f = $('#found'); if (f) f.innerHTML = foundHTML(memoFound(el.value)); }
   else if (k === 'rq') { S.rq = el.value; const pos = el.selectionStart; render(); const n = $('[data-in="rq"]'); n.focus(); n.setSelectionRange(pos, pos); }
   else if (k === 'pq') { S.sheet.q = el.value; const pos = el.selectionStart; renderSheet(); const n = $('[data-in="pq"]'); n.focus(); n.setSelectionRange(pos, pos); }
+  else if (k === 'slot-note') { const sl = getSlot(S.sheet.date, S.sheet.k), v = el.value.trim(); if (v) sl.n = v; else delete sl.n; save(); }
   else if (k === 'fp') { S.sheet.text = el.value; const p = $('#fp-parse'); if (p) p.innerHTML = fpPreview(el.value); }
   else if (k === 'fi-name' || k === 'fi-q') S.sheet[k.slice(3)] = el.value;
   else if (k === 'name-me' || k === 'name-him') { state.names[k.slice(5)] = el.value.trim() || (k === 'name-me' ? '나' : '남편'); save(); }
@@ -956,12 +982,81 @@ async function importFile(file) {
   state.importedAt = Date.now(); buildIndex(); await flush(); closeSheet(); render();
   toast(t(`메뉴와 레시피 ${added}개를 불러왔어요`, `Loaded menus and ${added} recipes`));
 }
+/* ───────── 기다리는 동안 고양이 (백업 · 사진 모음 · 남편 공유, 목업 .grill/meal-planner-loading-mockup.html A안) ─────────
+   0.4초 안에 끝나면 안 뜸. 공유 창은 기다리지 않고 바로 열고(iOS 사용자 동작 만료 방지), 카드는 그 뒤에서 사라짐 */
+const WAIT_CAT = `<svg class="dd w-cat" width="74" height="86" viewBox="0 0 74 86" aria-hidden="true">
+  <g class="w-tail"><path d="M58 76c9 1 13-5 11-11-1-3-4-4.5-6.5-3.5"/></g>
+  <path d="M21 46c-6 8-8 19-6 29 1 4 4 6.5 8 6.5h26c4 0 7-2.5 8-6.5 2-10 0-21-6-29" style="fill:var(--paper)"/>
+  <path d="M41 60c3-2.5 8.5-1.5 9.5 3-2.5 3-7.5 3-9.5-3z" style="fill:var(--ink)"/><path d="M30 82v-7M44 82v-7"/>
+  <g class="w-head"><path d="M14 43c-4-4-5-10-4-16 1-4 3-7 6-9L18 4l11 9c5-1.5 9-1.5 14 0l11-9 2 14c3 2 5 5 6 9 1 6 0 12-4 16-5 5-12 6-22 6s-17-1-22-6z" style="fill:var(--paper)"/>
+    <path d="M16.4 17.8 18 4l11 9c-5 1-9 2.4-12.6 4.8z" style="fill:var(--ink)"/>
+    <circle class="w-eye" cx="28.5" cy="30" r="2" style="fill:var(--ink)" stroke="none"/><circle class="w-eye" cx="43.5" cy="30" r="2" style="fill:var(--ink)" stroke="none"/>
+    <path d="M33 35q1.5 2.2 3 0q1.5 2.2 3 0"/>
+    <ellipse class="w-bl" cx="22" cy="35.5" rx="3.6" ry="2.2" style="fill:var(--blush)" stroke="none"/><ellipse class="w-bl" cx="50" cy="35.5" rx="3.6" ry="2.2" style="fill:var(--blush)" stroke="none"/></g></svg>`;
+const WAIT_DRAW = {
+  backup: ['M6 26c20-3 40 3 60 0s46-3 78 0'],
+  collage: ['M30 4h90v38H30z', 'M60 4v38', 'M90 4v38', 'M30 23h90'],
+  plan: ['M22 6h106', 'M22 18h106', 'M22 30h106', 'M22 42h106', 'M44 6v36', 'M86 6v36'],
+};
+const WAIT_SAY = { ko: ['냥', '조금만!', '거의 다 됐어', '사진 고르는 중', '간식은 나중에', '냐앙'], en: ['Meow', 'Almost!', 'Nearly there', 'Picking photos', 'Snacks later', 'Mrrow'] };
+let W = null;
+function waitStart(kind) {
+  waitHide(true);
+  const [msg, hint] = {
+    backup: [t('백업 만드는 중', 'Making the backup'), t('기록을 챙기는 중이에요', 'Packing up the log')],
+    collage: [t('사진 모음 만드는 중', 'Making the collage'), t('코치에게 보낼 한 장으로 붙여요', 'One image for the coach')],
+    plan: [t('계획표 그리는 중', 'Drawing the plan'), t(`${state.names.him}에게 보낼 이미지예요`, `An image for ${state.names.him}`)],
+  }[kind];
+  const el = document.createElement('div'); el.id = 'wait'; el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="w-dim"></div><div class="w-card pen">
+    <button class="w-stage" data-a="wait-poke" aria-label="${t('고양이 쓰다듬기', 'Pet the cat')}">${WAIT_CAT}<span class="w-bub pen"></span>
+      <svg class="dd w-heart" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14S2 10 2 6a3 3 0 0 1 6-1 3 3 0 0 1 6 1c0 4-6 8-6 8z" style="fill:var(--blush)"/></svg></button>
+    <svg class="dd w-draw ${kind === 'backup' ? 'prog' : 'loop'}" viewBox="0 0 150 46" aria-hidden="true">${WAIT_DRAW[kind].map(d => `<path class="ln" pathLength="1" d="${d}"/>`).join('')}</svg>
+    <div class="w-msg">${msg}</div><div class="w-hint">${hint}</div></div>`;
+  document.body.appendChild(el);
+  W = { el, kind, shown: 0, say: 0 };
+  W.timer = setTimeout(() => { el.classList.add('in'); W.shown = Date.now(); }, 400);
+}
+function waitProgress(i, n) {
+  if (!W || !n) return;
+  W.el.querySelector('.w-hint').textContent = t(`사진 ${i} / ${n}장 챙겼어요`, `${i} / ${n} photos packed`);
+  W.el.querySelector('.ln').style.strokeDashoffset = 1 - i / n;
+}
+function waitDone() {
+  if (!W) return;
+  clearTimeout(W.timer);
+  if (!W.shown) return waitHide(true); // 너무 빨리 끝남 — 안 보여 줌
+  W.el.querySelector('.w-msg').textContent = t('다 됐어요', 'All done');
+  W.el.querySelector('.w-hint').textContent = W.kind === 'backup' ? t('파일을 저장해요', 'Saving the file') : t('공유 창을 열어요', 'Opening the share sheet');
+  const d = W.el.querySelector('.w-draw'); d.setAttribute('class', 'dd w-draw'); d.innerHTML = '<path d="M58 24l12 12 24-26"/>';
+  W.el.classList.add('done');
+}
+async function waitHide(now) {
+  const w = W; W = null; if (!w) return;
+  clearTimeout(w.timer);
+  if (!now && w.shown) { const left = 900 - (Date.now() - w.shown); if (left > 0) await new Promise(r => setTimeout(r, left)); }
+  w.el.classList.remove('in'); setTimeout(() => w.el.remove(), now ? 0 : 260);
+}
+function waitPoke() {
+  if (!W) return;
+  const re = (el, c) => { el.classList.remove(c); void el.offsetWidth; el.classList.add(c); };
+  re(W.el.querySelector('.w-cat'), 'hop'); re(W.el.querySelector('.w-stage'), 'blushy'); re(W.el.querySelector('.w-heart'), 'go');
+  const b = W.el.querySelector('.w-bub'), says = WAIT_SAY[state.lang];
+  b.textContent = says[W.say++ % says.length]; b.classList.add('in');
+  clearTimeout(W.bub); W.bub = setTimeout(() => b.classList.remove('in'), 1100);
+}
+
 async function backupZip() {
-  toast(t('백업 파일을 만드는 중…', 'Making the backup…'));
-  const enc = new TextEncoder(), files = [{ name: 'state.json', data: enc.encode(JSON.stringify(state)) }];
-  for (const id of await photoKeys()) { const b = await photoGet(id); files.push({ name: `photos/${id}.jpg`, data: new Uint8Array(await b.arrayBuffer()) }); }
-  const ok = await shareFile(Zip.zip(files), `mealcat-backup-${todayStr()}.zip`);
-  if (ok) { state.backupAt = Date.now(); save(); render(); }
+  waitStart('backup');
+  try {
+    const enc = new TextEncoder(), files = [{ name: 'state.json', data: enc.encode(JSON.stringify(state)) }];
+    const ids = await photoKeys();
+    for (const [i, id] of ids.entries()) { const b = await photoGet(id); files.push({ name: `photos/${id}.jpg`, data: new Uint8Array(await b.arrayBuffer()) }); waitProgress(i + 1, ids.length); }
+    const zip = Zip.zip(files);
+    waitDone();
+    const ok = await shareFile(zip, `mealcat-backup-${todayStr()}.zip`);
+    if (ok) { state.backupAt = Date.now(); save(); render(); }
+  } finally { waitHide(); }
 }
 async function restoreFile(file) {
   if (!confirm(t('지금 기록을 백업 내용으로 바꿀까요?', 'Replace current data with this backup?'))) return;
@@ -1031,7 +1126,10 @@ function wrapText(ctx, text, x, y, maxW, lineH, maxLines = 3) {
 }
 async function sendCoach(mon) {
   const w = getWeek(mon, false); if (!w) { toast(t('이번 주 기록이 아직 없어요', 'No log for this week yet')); return; }
-  toast(t('사진 모음을 만드는 중…', 'Making the collage…'));
+  waitStart('collage');
+  try { await coachCollage(mon, w); } finally { waitHide(); }
+}
+async function coachCollage(mon, w) {
   await document.fonts.ready;
   const C = 300, LW = 110, HEAD = 110, W = LW + C * 3, H = HEAD + C * 7 + 30;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
@@ -1059,7 +1157,8 @@ async function sendCoach(mon) {
   }
   const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.82));
   const text = weekText(mon);
-  try { await navigator.clipboard?.writeText(text); } catch { }
+  await copyText(text);
+  waitDone();
   const files = [new File([blob], `mealcat-${mon}.jpg`, { type: 'image/jpeg' }), new File([text], `mealcat-${mon}.txt`, { type: 'text/plain' })];
   let ok = false;
   if (navigator.canShare?.({ files })) { try { await navigator.share({ files }); ok = true; } catch (e) { if (e.name === 'AbortError') return; } }
@@ -1077,6 +1176,10 @@ function symbolImage(id, w, h) {
 }
 async function shareHim(mon) {
   const w = getWeek(mon, false); if (!weekStats(mon).plans) { toast(t('보낼 계획이 아직 없어요', 'No plan to share yet')); return; }
+  waitStart('plan');
+  try { await planImage(mon, w); } finally { waitHide(); }
+}
+async function planImage(mon, w) {
   await document.fonts.ready;
   const W = 1080, LW = 110, CW = (W - LW - 40) / 3, RH = 150, HEAD = 232, H = HEAD + RH * 7 + 140;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
@@ -1097,7 +1200,7 @@ async function shareHim(mon) {
     for (const k of slotsOf(s)) {
       const cw = k === 'BR' ? CW * 2 : CW, sl = w.days[s]?.slots[k] || {};
       rrect(ctx, x + 6, y + 6, cw - 12, RH - 12, 20); ctx.strokeStyle = ink; ctx.lineWidth = 2.4; ctx.stroke();
-      if (k === 'BR' || (isWeekend(s) && k === 'D')) { ctx.fillStyle = pencil; ctx.font = '20px Jua'; ctx.fillText(slotL(k), x + 22, y + 38); }
+      if (k === 'BR' || (isTwo(s) && k === 'D')) { ctx.fillStyle = pencil; ctx.font = '20px Jua'; ctx.fillText(slotL(k), x + 22, y + 38); }
       const pr = prepOf(s, sl.pp);
       if (pr && !(k === 'BR')) { ctx.fillStyle = pencil; ctx.font = '20px Jua'; ctx.fillText(prepL(pr.type), x + 22, y + 38); }
       ctx.fillStyle = ink;
@@ -1105,13 +1208,14 @@ async function shareHim(mon) {
         ctx.font = 'bold 30px Gaegu';
         if (me) ctx.drawImage(me, x + 18, y + 26, 28, 28); ctx.fillText(m(sl.p) || '—', x + 52, y + 50, cw - 70);
         if (him) ctx.drawImage(him, x + 18, y + 84, 28, 28); ctx.fillText(m(sl.h) || '—', x + 52, y + 108, cw - 70);
-      } else { ctx.font = 'bold 34px Gaegu'; wrapText(ctx, m(sl.p) || '', x + 22, y + (pr || k === 'BR' || isWeekend(s) ? 82 : 66), cw - 44, 36, 2); }
+      } else { ctx.font = 'bold 34px Gaegu'; wrapText(ctx, m(sl.p) || '', x + 22, y + (pr || k === 'BR' || isTwo(s) ? 82 : 66), cw - 44, 36, 2); }
       x += cw;
     }
   }
   if (w.preps.length) { ctx.fillStyle = pencil; ctx.font = '26px "Gowun Dodum"'; wrapText(ctx, t('밀프랩 · ', 'Meal prep · ') + w.preps.map(p => `${prepL(p.type)} ${m(p.name)} ×${p.count}`).join(' · '), 40, HEAD + RH * 7 + 56, W - 80, 34, 2); }
   ctx.fillStyle = '#d0cbc6'; ctx.font = '22px Jua'; ctx.fillText('Mealcat', W - 130, H - 26);
   const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+  waitDone();
   await shareFile(blob, `mealcat-${mon}.png`);
 }
 
