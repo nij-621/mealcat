@@ -254,8 +254,10 @@ function vWeek() {
   }
   h += `<div class="wk-hint">${t('평일 요일을 누르면 2끼 날(브런치·저녁)로 바뀌어요', 'Tap a weekday to make it a 2-meal day (brunch + dinner)')}</div>`;
   if (w?.preps.length) h += `<div class="mp pen"><b>${t('밀프랩', 'Meal prep')}</b><span>${w.preps.map(p => `${prepL(p.type)} ${esc(m(p.name))} ${Math.max(0, prepLeft(w, p.id))}/${p.count}`).join(' · ')}</span></div>`;
+  if (w && mon < mondayOf(today)) h += `<div class="wk-del"><button class="ghost pen" data-a="week-del" data-v="${mon}">${ic('i-x')}${t('이 주 기록 지우기', 'Delete this week')}</button></div>`;
   return h;
 }
+const weekPhotos = w => Object.values(w.days).flatMap(d => Object.values(d.slots)).map(sl => sl.a?.photo).filter(Boolean);
 function cell(s, k, sl, past) {
   const span = k === 'BR' ? ' span' : '';
   const attrs = `data-a="pick" data-d="${s}" data-k="${k}"`;
@@ -543,9 +545,26 @@ function shPick() {
   if (!actual) {
     h += `<div class="seg pen"><button class="${split ? '' : 'on'}" data-a="split" data-v="0">${t('같이 먹어요', 'Together')}</button><button class="${split ? 'on' : ''}" data-a="split" data-v="1">${t('따로 먹어요', 'Separately')}</button></div>`;
     if (split) h += `<div class="who">${['me', 'him'].map(who => `<button class="pen${P.side === who ? ' on' : ''}" data-a="side" data-v="${who}">${ic(who, 'av')}<span><b>${esc(state.names[who])}</b><small>${esc(m(planName(sl, who))) || '—'}</small></span></button>`).join('')}</div>`;
-    h += `<div class="field pen memo-f">${ic('i-pen')}<input data-in="slot-note" value="${esc(sl.n || '')}" placeholder="${t('메모 — 칸 아래 작게 보여요', 'Note — shown small under the dish')}" maxlength="40" enterkeyhint="done"></div>`;
-    if (s <= todayStr()) h += `<div class="pick-actual">${ic('i-cam', 'p')}<button class="today-link" data-a="goto-day" data-v="${s}">${t('이 날 기록하러 가기', 'Log this day')}</button></div>`;
   }
+  // 검색 → 메모를 맨 위에 (2026-10-24). 검색어가 있으면 결과만 보여 줌
+  const q = (P.q || '').trim();
+  h += `<div class="field pen">${ic('i-search')}<input data-in="pq" value="${esc(P.q || '')}" placeholder="${t('전체 메뉴·레시피에서 찾기 / 새 이름 쓰기', 'Search all, or type a new dish')}" enterkeyhint="done"></div>`;
+  if (!actual) h += `<div class="field pen memo-f">${ic('i-pen')}<input data-in="slot-note" value="${esc(sl.n || '')}" placeholder="${t('메모 — 칸 아래 작게 보여요', 'Note — shown small under the dish')}" maxlength="40" enterkeyhint="done"></div>`;
+  if (q) {
+    const all = new Map();
+    for (const l of Object.values(state.menus)) for (const x of l) if ([x.name, x.en, ...(x.aka || [])].join(' ').toLowerCase().includes(q.toLowerCase())) all.set(x.name, { n: x.name, c: x.n });
+    for (const r of state.recipes) if ([r.name, r.name_en, ...(r.tags || [])].join(' ').toLowerCase().includes(q.toLowerCase())) all.set(r.name, { n: r.name, r: 1 });
+    h += `<div class="cands" style="margin-top:8px">${[...all.values()].slice(0, 16).map(x => cand(x.n, cur, x.r)).join('')}
+      <button class="cand pen dash" data-a="choose" data-v="${esc(q)}">+ “${esc(q)}”</button></div>`;
+  } else h += pickLists(P, s, k, w, cur, actual);
+  h += `<div class="two" style="margin-top:14px">
+    <button class="ghost pen" data-a="choose" data-v="${OUT}">${ic('i-out')}${t('외식 · 배달', 'Eating out')}</button>
+    <button class="ghost pen" data-a="clear-slot">${actual ? t('기록 지우기', 'Clear log') : t('비워 두기', 'Leave empty')}</button></div>`;
+  return h;
+}
+function pickLists(P, s, k, w, cur, actual) {
+  let h = '';
+  if (!actual && s <= todayStr()) h += `<div class="pick-actual">${ic('i-cam', 'p')}<button class="today-link" data-a="goto-day" data-v="${s}">${t('이 날 기록하러 가기', 'Log this day')}</button></div>`;
   if (k === 'B') {
     const bases = slotMenus('B').slice(0, 12), fruits = [...state.menus.F].sort((a, b) => (b.n || 0) - (a.n || 0));
     const combo = [P.base, ...P.fruits].filter(Boolean).join('+');
@@ -559,21 +578,8 @@ function shPick() {
     <div class="cands">${found.map(n => cand(n, cur)).join('')}</div>`;
   if (w?.preps.length) h += `<div class="sec"><b>${t('밀프랩', 'Meal prep')}</b><span>${t('고르면 남은 개수가 줄어요', 'count drops when picked')}</span></div>
     ${w.preps.map(p => { const left = prepLeft(w, p.id); return `<button class="mprow pen${left <= 0 ? ' zero' : ''}" data-a="choose-prep" data-v="${p.id}"><span class="tag">${prepL(p.type)}</span><span class="nm">${esc(m(p.name))}</span><span class="left">${left > 0 ? t(`${left}개 남음`, `${left} left`) : t('다 씀', 'all used')}</span></button>`; }).join('')}`;
-  const q = (P.q || '').trim();
-  h += `<div class="field pen">${ic('i-search')}<input data-in="pq" value="${esc(P.q || '')}" placeholder="${t('전체 메뉴·레시피에서 찾기 / 새 이름 쓰기', 'Search all, or type a new dish')}" enterkeyhint="done"></div>`;
-  if (q) {
-    const all = new Map();
-    for (const l of Object.values(state.menus)) for (const x of l) if ([x.name, x.en, ...(x.aka || [])].join(' ').toLowerCase().includes(q.toLowerCase())) all.set(x.name, { n: x.name, c: x.n });
-    for (const r of state.recipes) if ([r.name, r.name_en, ...(r.tags || [])].join(' ').toLowerCase().includes(q.toLowerCase())) all.set(r.name, { n: r.name, r: 1 });
-    h += `<div class="cands" style="margin-top:8px">${[...all.values()].slice(0, 16).map(x => cand(x.n, cur, x.r)).join('')}
-      <button class="cand pen dash" data-a="choose" data-v="${esc(q)}">+ “${esc(q)}”</button></div>`;
-  } else {
-    const list = (k === 'B' ? [] : slotMenus(k)).filter(x => x.name !== OUT).slice(0, 16);
-    if (list.length) h += `<div class="sec"><b>${t('자주 먹은 메뉴', 'Most eaten')}</b><span>${slotL(k)}</span></div><div class="cands">${list.map(x => cand(x.name, cur, 0, x.n)).join('')}</div>`;
-  }
-  h += `<div class="two" style="margin-top:14px">
-    <button class="ghost pen" data-a="choose" data-v="${OUT}">${ic('i-out')}${t('외식 · 배달', 'Eating out')}</button>
-    <button class="ghost pen" data-a="clear-slot">${actual ? t('기록 지우기', 'Clear log') : t('비워 두기', 'Leave empty')}</button></div>`;
+  const list = (k === 'B' ? [] : slotMenus(k)).filter(x => x.name !== OUT).slice(0, 16);
+  if (list.length) h += `<div class="sec"><b>${t('자주 먹은 메뉴', 'Most eaten')}</b><span>${slotL(k)}</span></div><div class="cands">${list.map(x => cand(x.name, cur, 0, x.n)).join('')}</div>`;
   return h;
 }
 const cand = (n, cur, isR, cnt) => `<button class="cand pen${n === cur ? ' on' : ''}" data-a="choose" data-v="${esc(n)}">${esc(m(n))}${isR || state.recipes.some(r => r.name === n) ? `<span class="rcp">${t('레시피', 'Recipe')}</span>` : cnt ? `<span class="n">${cnt}</span>` : ''}</button>`;
@@ -901,6 +907,13 @@ const A = {
   lang: v => { state.lang = v; save(); render(); },
   'coach-copy': () => copyToast(COACH, t('지침을 복사했어요 · 프로젝트에 붙여 넣으세요', 'Instructions copied · paste them into the project')),
   import: () => pickFile('.json,application/json', importFile),
+  'week-del': v => {
+    const w = state.weeks[v]; if (!w) return;
+    const ph = weekPhotos(w);
+    if (!confirm(t(`${rangeL(v)} 기록을 지울까요?${ph.length ? ` 사진 ${ph.length}장도 같이 지워져요.` : ''} 되돌릴 수 없어요.`, `Delete the ${rangeL(v)} week?${ph.length ? ` Its ${ph.length} photos go too.` : ''} This can’t be undone.`))) return;
+    for (const id of ph) photoDel(id);
+    delete state.weeks[v]; save(); S.tab = 'history'; scrollTo(0, 0); render(); toast(t(`${rangeL(v)}을 지웠어요`, `Deleted ${rangeL(v)}`));
+  },
   'legacy-del': () => {
     const mons = legacyWeeks(); if (!confirm(t(`메모앱에서 옮긴 ${mons.length}주를 지울까요? 메뉴 목록은 그대로예요.`, `Remove ${mons.length} weeks from the notes app? Your menu list stays.`))) return;
     for (const mon of mons) {

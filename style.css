@@ -370,3 +370,5 @@ button.wk-day:active{transform:scale(.94)}
   .w-draw.loop .ln{stroke-dashoffset:0}
   #wait .w-card{transition:opacity 200ms ease}
 }
+.wk-del{display:flex;justify-content:center;margin-top:18px}
+.wk-del .ghost{color:var(--pencil)}
