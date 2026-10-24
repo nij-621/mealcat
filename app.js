@@ -1,5 +1,7 @@
 // Mealcat — 주간 식단 계획 + 사진 기록 (서버·AI 없음, 데이터는 이 기기 IndexedDB)
 'use strict';
+// 버전: sw.js의 CACHE와 같이 올림. 0.1씩, v1.9 다음은 v2.0
+const VERSION = '1.6';
 
 /* ───────── 작은 도구 ───────── */
 const $ = s => document.querySelector(s);
@@ -702,7 +704,7 @@ function addRecipes(cards) {
 
 /* 설정 */
 function shSettings() {
-  return `<div class="sh-top"><div><b>${t('설정', 'Settings')}</b><p>Mealcat</p></div>${xBtn()}</div>
+  return `<div class="sh-top"><div><b>${t('설정', 'Settings')}</b><p>Mealcat v${VERSION}</p></div>${xBtn()}</div>
   <div class="set-row"><div><b>${t('언어', 'Language')}</b><small>${t('메뉴 이름도 함께 바뀌어요', 'Dish names switch too')}</small></div>
     <div class="lang pen"><button class="${state.lang === 'ko' ? 'on' : ''}" data-a="lang" data-v="ko">한국어</button><button class="${state.lang === 'en' ? 'on' : ''}" data-a="lang" data-v="en">English</button></div></div>
   <div class="set-row"><div><b>${t('이름', 'Names')}</b><small>${t('따로 먹는 칸에 보여요', 'Shown on split slots')}</small></div>
