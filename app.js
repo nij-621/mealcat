@@ -1,7 +1,7 @@
 // Mealcat — 주간 식단 계획 + 사진 기록 (서버·AI 없음, 데이터는 이 기기 IndexedDB)
 'use strict';
 // 버전: sw.js의 CACHE와 같이 올림. 0.1씩, v1.9 다음은 v2.0
-const VERSION = '1.7';
+const VERSION = '1.8';
 
 /* ───────── 작은 도구 ───────── */
 const $ = s => document.querySelector(s);
@@ -519,7 +519,7 @@ function closeSheet() {
   setTimeout(() => { if (!S.sheet) $('#sheet-root').innerHTML = ''; }, 300);
 }
 function renderSheet(fresh) {
-  const root = $('#sheet-root'); const html = { pick: shPick, recipe: shRecipe, radd: shRecipeAdd, settings: shSettings, ask: shAsk, fpaste: shFridgePaste, fitem: shFitem }[S.sheet.type]();
+  const root = $('#sheet-root'); const html = { pick: shPick, recipe: shRecipe, radd: shRecipeAdd, settings: shSettings, ask: shAsk, fpaste: shFridgePaste, fitem: shFitem, photo: shPhoto }[S.sheet.type]();
   let sh = $('.sheet');
   if (fresh || !sh) {
     root.innerHTML = `<div class="dim" data-a="close"></div><div class="sheet" role="dialog" aria-modal="true"><div class="in-w"></div></div>`;
@@ -531,6 +531,17 @@ function renderSheet(fresh) {
   const f = sh.querySelector('[autofocus]'); if (f && fresh) setTimeout(() => f.focus(), 340);
 }
 const xBtn = () => `<button class="x" data-a="close" aria-label="${t('닫기', 'Close')}">${ic('i-x')}</button>`;
+
+/* 찍은 사진 (오늘 카드) */
+function shPhoto() {
+  const { date: s, k } = S.sheet, a = getSlot(s, k, false)?.a || {};
+  const nm = a.s === 'out' ? outL(a) : m(a.m || '');
+  return `<div class="sh-top"><div><b>${esc(nm) || slotL(k)}</b><p>${dateL(s)} · ${slotL(k)}${a.t ? ' · ' + hhmm(a.t) : ''}</p></div>${xBtn()}</div>
+  ${a.photo ? `<button class="thumb pen big-photo" data-a="photo-big" aria-label="${t('크게 보기', 'View full size')}">${pimg(a.photo)}</button>` : ''}
+  <div class="two" style="margin-top:12px"><button class="ghost pen" data-a="shoot" data-d="${s}" data-k="${k}">${ic('i-cam')}${t('다시 찍기', 'Retake')}</button>
+    <button class="ghost pen" data-a="album" data-d="${s}" data-k="${k}">${ic('i-grid')}${t('앨범에서', 'From album')}</button></div>
+  <button class="ghost pen wide" data-a="photo-del">${ic('i-x')}${t('사진만 지우기', 'Delete photo only')}</button>`;
+}
 
 /* 메뉴 고르기 */
 function slotMenus(k) {
@@ -799,9 +810,13 @@ const A = {
   },
   shoot: (v, el) => { camTarget = { d: el.dataset.d, k: el.dataset.k }; $('#in-cam').value = ''; $('#in-cam').click(); },
   album: (v, el) => { camTarget = { d: el.dataset.d, k: el.dataset.k }; $('#in-album').value = ''; $('#in-album').click(); },
-  'photo-view': async (v, el) => {
-    const sl = getSlot(el.dataset.d, el.dataset.k, false); if (!sl?.a?.photo) return;
-    const u = await purl(sl.a.photo); if (u) window.open(u, '_blank');
+  'photo-view': (v, el) => openSheet({ type: 'photo', date: el.dataset.d, k: el.dataset.k }),
+  'photo-big': async () => { const sl = getSlot(S.sheet.date, S.sheet.k, false); const u = sl?.a?.photo && await purl(sl.a.photo); if (u) window.open(u, '_blank'); },
+  'photo-del': () => {
+    const sl = getSlot(S.sheet.date, S.sheet.k, false); if (!sl?.a?.photo || !confirm(t('사진만 지울까요? 먹은 메뉴는 남아요.', 'Delete just the photo? The meal stays logged.'))) return;
+    photoDel(sl.a.photo); delete sl.a.photo;
+    if (!sl.a.s) delete sl.a; // 이름 없이 사진만 있던 기록은 통째로
+    save(); closeSheet(); render(); toast(t('사진을 지웠어요', 'Photo deleted'));
   },
 
   snack: v => { getDay(S.day).snacks.push({ n: v, t: S.day === todayStr() ? Date.now() : parse(S.day).setHours(15) }); save(); render(); const b = [...document.querySelectorAll('[data-a="snack"]')].find(x => x.dataset.v === v); b?.classList.add('just'); setTimeout(() => b?.classList.remove('just'), 900); },
