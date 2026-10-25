@@ -1,7 +1,7 @@
 // Mealcat — 주간 식단 계획 + 사진 기록 (서버·AI 없음, 데이터는 이 기기 IndexedDB)
 'use strict';
 // 버전: sw.js의 CACHE와 같이 올림. 0.1씩, v1.9 다음은 v2.0
-const VERSION = '1.8';
+const VERSION = '1.9';
 
 /* ───────── 작은 도구 ───────── */
 const $ = s => document.querySelector(s);
@@ -855,7 +855,6 @@ const A = {
   },
   'send-coach': () => sendCoach(S.weekOf),
   'share-him': () => shareHim(S.weekOf),
-  'wait-poke': () => waitPoke(),
 
   'menu-add': async v => { const n = (await ask(t('메뉴 이름', 'Dish name'), ''))?.trim(); if (!n) return; if (!state.menus[v].some(x => x.name === n)) state.menus[v].push({ name: n, n: 0 }); buildIndex(); save(); render(); },
   'menu-ren': async v => {
@@ -1012,81 +1011,12 @@ async function importFile(file) {
   state.importedAt = Date.now(); buildIndex(); await flush(); closeSheet(); render();
   toast(t(`메뉴와 레시피 ${added}개를 불러왔어요`, `Loaded menus and ${added} recipes`));
 }
-/* ───────── 기다리는 동안 고양이 (백업 · 사진 모음 · 남편 공유, 목업 .grill/meal-planner-loading-mockup.html A안) ─────────
-   0.4초 안에 끝나면 안 뜸. 공유 창은 기다리지 않고 바로 열고(iOS 사용자 동작 만료 방지), 카드는 그 뒤에서 사라짐 */
-const WAIT_CAT = `<svg class="dd w-cat" width="74" height="86" viewBox="0 0 74 86" aria-hidden="true">
-  <g class="w-tail"><path d="M58 76c9 1 13-5 11-11-1-3-4-4.5-6.5-3.5"/></g>
-  <path d="M21 46c-6 8-8 19-6 29 1 4 4 6.5 8 6.5h26c4 0 7-2.5 8-6.5 2-10 0-21-6-29" style="fill:var(--paper)"/>
-  <path d="M41 60c3-2.5 8.5-1.5 9.5 3-2.5 3-7.5 3-9.5-3z" style="fill:var(--ink)"/><path d="M30 82v-7M44 82v-7"/>
-  <g class="w-head"><path d="M14 43c-4-4-5-10-4-16 1-4 3-7 6-9L18 4l11 9c5-1.5 9-1.5 14 0l11-9 2 14c3 2 5 5 6 9 1 6 0 12-4 16-5 5-12 6-22 6s-17-1-22-6z" style="fill:var(--paper)"/>
-    <path d="M16.4 17.8 18 4l11 9c-5 1-9 2.4-12.6 4.8z" style="fill:var(--ink)"/>
-    <circle class="w-eye" cx="28.5" cy="30" r="2" style="fill:var(--ink)" stroke="none"/><circle class="w-eye" cx="43.5" cy="30" r="2" style="fill:var(--ink)" stroke="none"/>
-    <path d="M33 35q1.5 2.2 3 0q1.5 2.2 3 0"/>
-    <ellipse class="w-bl" cx="22" cy="35.5" rx="3.6" ry="2.2" style="fill:var(--blush)" stroke="none"/><ellipse class="w-bl" cx="50" cy="35.5" rx="3.6" ry="2.2" style="fill:var(--blush)" stroke="none"/></g></svg>`;
-const WAIT_DRAW = {
-  backup: ['M6 26c20-3 40 3 60 0s46-3 78 0'],
-  collage: ['M30 4h90v38H30z', 'M60 4v38', 'M90 4v38', 'M30 23h90'],
-  plan: ['M22 6h106', 'M22 18h106', 'M22 30h106', 'M22 42h106', 'M44 6v36', 'M86 6v36'],
-};
-const WAIT_SAY = { ko: ['냥', '조금만!', '거의 다 됐어', '사진 고르는 중', '간식은 나중에', '냐앙'], en: ['Meow', 'Almost!', 'Nearly there', 'Picking photos', 'Snacks later', 'Mrrow'] };
-let W = null;
-function waitStart(kind) {
-  waitHide(true);
-  const [msg, hint] = {
-    backup: [t('백업 만드는 중', 'Making the backup'), t('기록을 챙기는 중이에요', 'Packing up the log')],
-    collage: [t('사진 모음 만드는 중', 'Making the collage'), t('코치에게 보낼 한 장으로 붙여요', 'One image for the coach')],
-    plan: [t('계획표 그리는 중', 'Drawing the plan'), t(`${state.names.him}에게 보낼 이미지예요`, `An image for ${state.names.him}`)],
-  }[kind];
-  const el = document.createElement('div'); el.id = 'wait'; el.setAttribute('role', 'status');
-  el.innerHTML = `<div class="w-dim"></div><div class="w-card pen">
-    <button class="w-stage" data-a="wait-poke" aria-label="${t('고양이 쓰다듬기', 'Pet the cat')}">${WAIT_CAT}<span class="w-bub pen"></span>
-      <svg class="dd w-heart" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14S2 10 2 6a3 3 0 0 1 6-1 3 3 0 0 1 6 1c0 4-6 8-6 8z" style="fill:var(--blush)"/></svg></button>
-    <svg class="dd w-draw ${kind === 'backup' ? 'prog' : 'loop'}" viewBox="0 0 150 46" aria-hidden="true">${WAIT_DRAW[kind].map(d => `<path class="ln" pathLength="1" d="${d}"/>`).join('')}</svg>
-    <div class="w-msg">${msg}</div><div class="w-hint">${hint}</div></div>`;
-  document.body.appendChild(el);
-  W = { el, kind, shown: 0, say: 0 };
-  W.timer = setTimeout(() => { el.classList.add('in'); W.shown = Date.now(); }, 400);
-}
-function waitProgress(i, n) {
-  if (!W || !n) return;
-  W.el.querySelector('.w-hint').textContent = t(`사진 ${i} / ${n}장 챙겼어요`, `${i} / ${n} photos packed`);
-  W.el.querySelector('.ln').style.strokeDashoffset = 1 - i / n;
-}
-function waitDone() {
-  if (!W) return;
-  clearTimeout(W.timer);
-  if (!W.shown) return waitHide(true); // 너무 빨리 끝남 — 안 보여 줌
-  W.el.querySelector('.w-msg').textContent = t('다 됐어요', 'All done');
-  W.el.querySelector('.w-hint').textContent = W.kind === 'backup' ? t('파일을 저장해요', 'Saving the file') : t('공유 창을 열어요', 'Opening the share sheet');
-  const d = W.el.querySelector('.w-draw'); d.setAttribute('class', 'dd w-draw'); d.innerHTML = '<path d="M58 24l12 12 24-26"/>';
-  W.el.classList.add('done');
-}
-async function waitHide(now) {
-  const w = W; W = null; if (!w) return;
-  clearTimeout(w.timer);
-  if (!now && w.shown) { const left = 900 - (Date.now() - w.shown); if (left > 0) await new Promise(r => setTimeout(r, left)); }
-  w.el.classList.remove('in'); setTimeout(() => w.el.remove(), now ? 0 : 260);
-}
-function waitPoke() {
-  if (!W) return;
-  const re = (el, c) => { el.classList.remove(c); void el.offsetWidth; el.classList.add(c); };
-  re(W.el.querySelector('.w-cat'), 'hop'); re(W.el.querySelector('.w-stage'), 'blushy'); re(W.el.querySelector('.w-heart'), 'go');
-  const b = W.el.querySelector('.w-bub'), says = WAIT_SAY[state.lang];
-  b.textContent = says[W.say++ % says.length]; b.classList.add('in');
-  clearTimeout(W.bub); W.bub = setTimeout(() => b.classList.remove('in'), 1100);
-}
-
 async function backupZip() {
-  waitStart('backup');
-  try {
-    const enc = new TextEncoder(), files = [{ name: 'state.json', data: enc.encode(JSON.stringify(state)) }];
-    const ids = await photoKeys();
-    for (const [i, id] of ids.entries()) { const b = await photoGet(id); files.push({ name: `photos/${id}.jpg`, data: new Uint8Array(await b.arrayBuffer()) }); waitProgress(i + 1, ids.length); }
-    const zip = Zip.zip(files);
-    waitDone();
-    const ok = await shareFile(zip, `mealcat-backup-${todayStr()}.zip`);
-    if (ok) { state.backupAt = Date.now(); save(); render(); }
-  } finally { waitHide(); }
+  toast(t('백업 파일을 만드는 중…', 'Making the backup…'));
+  const enc = new TextEncoder(), files = [{ name: 'state.json', data: enc.encode(JSON.stringify(state)) }];
+  for (const id of await photoKeys()) { const b = await photoGet(id); files.push({ name: `photos/${id}.jpg`, data: new Uint8Array(await b.arrayBuffer()) }); }
+  const ok = await shareFile(Zip.zip(files), `mealcat-backup-${todayStr()}.zip`);
+  if (ok) { state.backupAt = Date.now(); save(); render(); }
 }
 async function restoreFile(file) {
   if (!confirm(t('지금 기록을 백업 내용으로 바꿀까요?', 'Replace current data with this backup?'))) return;
@@ -1156,10 +1086,7 @@ function wrapText(ctx, text, x, y, maxW, lineH, maxLines = 3) {
 }
 async function sendCoach(mon) {
   const w = getWeek(mon, false); if (!w) { toast(t('이번 주 기록이 아직 없어요', 'No log for this week yet')); return; }
-  waitStart('collage');
-  try { await coachCollage(mon, w); } finally { waitHide(); }
-}
-async function coachCollage(mon, w) {
+  toast(t('사진 모음을 만드는 중…', 'Making the collage…'));
   await document.fonts.ready;
   const C = 300, LW = 110, HEAD = 110, W = LW + C * 3, H = HEAD + C * 7 + 30;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
@@ -1188,7 +1115,6 @@ async function coachCollage(mon, w) {
   const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.82));
   const text = weekText(mon);
   await copyText(text);
-  waitDone();
   const files = [new File([blob], `mealcat-${mon}.jpg`, { type: 'image/jpeg' }), new File([text], `mealcat-${mon}.txt`, { type: 'text/plain' })];
   let ok = false;
   if (navigator.canShare?.({ files })) { try { await navigator.share({ files }); ok = true; } catch (e) { if (e.name === 'AbortError') return; } }
@@ -1206,10 +1132,6 @@ function symbolImage(id, w, h) {
 }
 async function shareHim(mon) {
   const w = getWeek(mon, false); if (!weekStats(mon).plans) { toast(t('보낼 계획이 아직 없어요', 'No plan to share yet')); return; }
-  waitStart('plan');
-  try { await planImage(mon, w); } finally { waitHide(); }
-}
-async function planImage(mon, w) {
   await document.fonts.ready;
   const W = 1080, LW = 110, CW = (W - LW - 40) / 3, RH = 150, HEAD = 232, H = HEAD + RH * 7 + 140;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
@@ -1245,7 +1167,6 @@ async function planImage(mon, w) {
   if (w.preps.length) { ctx.fillStyle = pencil; ctx.font = '26px "Gowun Dodum"'; wrapText(ctx, t('밀프랩 · ', 'Meal prep · ') + w.preps.map(p => `${prepL(p.type)} ${m(p.name)} ×${p.count}`).join(' · '), 40, HEAD + RH * 7 + 56, W - 80, 34, 2); }
   ctx.fillStyle = '#d0cbc6'; ctx.font = '22px Jua'; ctx.fillText('Mealcat', W - 130, H - 26);
   const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
-  waitDone();
   await shareFile(blob, `mealcat-${mon}.png`);
 }
 
@@ -1298,12 +1219,32 @@ const COACH = `너는 내 식단 코치야. 나는 매주 주말에 장을 본 �
 - 줄임말: 간계밥=간장계란밥, 식판밥=밥+반찬, 돼고김=돼지고기김치찌개, 상밀=냉장 밀프랩, 냉밀=냉동 밀프랩, 라나=인스턴트파스타, 토달볶=토마토달걀볶음
 - 습관: 아침에 따뜻한 차 한 잔, 하루 과일 1개`;
 
+/* ───────── 시작 화면 (목업 .grill/meal-planner-splash-mockup.html A안) ─────────
+   앱은 이미 뒤에 그려져 있고 이건 덮개. 고양이 0 → 글자 120부터 70ms 간격 → 윙크 → 1000에 사라짐. 누르면 바로 끝 */
+async function splash() {
+  const sp = $('#splash'); if (!sp) return;
+  let done = false;
+  const out = () => { if (done) return; done = true; sp.classList.add('out'); setTimeout(() => sp.remove(), 260); };
+  sp.addEventListener('click', out);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { sp.remove(); return; }
+  // 글씨체가 0.5초 안에 안 오면 기다리지 않고 바로 앱으로
+  const fonts = await Promise.race([document.fonts.load('52px Jua', 'Mealcat').then(() => true), new Promise(r => setTimeout(() => r(false), 500))]);
+  if (!fonts) return out();
+  const at = (ms, fn) => setTimeout(() => { if (!done) fn(); }, ms);
+  sp.querySelector('.s-tag').textContent = t('이번 주도 잘 먹어요', 'Eat well this week');
+  const cat = sp.querySelector('.s-cat'), chs = sp.querySelectorAll('.s-word span');
+  at(0, () => cat.classList.add('in'));
+  chs.forEach((c, i) => at(120 + i * 70, () => c.classList.add('in')));
+  at(120 + chs.length * 70, () => { sp.querySelector('.s-caret').classList.add('off'); sp.querySelector('.s-tag').classList.add('in'); cat.classList.add('wink'); });
+  at(1000, out);
+}
+
 /* ───────── 시작 ───────── */
 (async () => {
   db = await openDB();
   const saved = await kvGet('state');
   if (saved) state = { ...state, ...saved, names: { ...state.names, ...(saved.names || {}) }, menus: { ...state.menus, ...(saved.menus || {}) } };
-  buildIndex(); render();
+  buildIndex(); render(); splash();
   navigator.storage?.persist?.();
   document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); else if (S.tab === 'today' && S.day < todayStr() && !S.sheet) { S.day = todayStr(); render(); } });
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');

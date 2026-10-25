@@ -179,6 +179,21 @@
     <symbol id="i-copy" viewBox="0 0 32 32"><rect x="10" y="10" width="15" height="17" rx="3"/><path d="M7 21V8a3 3 0 0 1 3-3h10"/></symbol>
   </defs>
 </svg>
+<!-- 시작 화면: JS보다 먼저 그려지게 HTML에 둠. 움직임은 app.js splash() -->
+<div id="splash" aria-hidden="true">
+  <svg class="dd s-cat" width="74" height="86" viewBox="0 0 74 86">
+    <g class="s-tail"><path d="M58 76c9 1 13-5 11-11-1-3-4-4.5-6.5-3.5"/></g>
+    <path d="M21 46c-6 8-8 19-6 29 1 4 4 6.5 8 6.5h26c4 0 7-2.5 8-6.5 2-10 0-21-6-29" style="fill:var(--paper)"/>
+    <path d="M41 60c3-2.5 8.5-1.5 9.5 3-2.5 3-7.5 3-9.5-3z" style="fill:var(--ink)"/><path d="M30 82v-7M44 82v-7"/>
+    <path d="M14 43c-4-4-5-10-4-16 1-4 3-7 6-9L18 4l11 9c5-1.5 9-1.5 14 0l11-9 2 14c3 2 5 5 6 9 1 6 0 12-4 16-5 5-12 6-22 6s-17-1-22-6z" style="fill:var(--paper)"/>
+    <path d="M16.4 17.8 18 4l11 9c-5 1-9 2.4-12.6 4.8z" style="fill:var(--ink)"/>
+    <circle class="s-eye" cx="28.5" cy="30" r="2" style="fill:var(--ink)" stroke="none"/><circle class="s-eye r" cx="43.5" cy="30" r="2" style="fill:var(--ink)" stroke="none"/>
+    <path d="M33 35q1.5 2.2 3 0q1.5 2.2 3 0"/>
+    <ellipse cx="22" cy="35.5" rx="3.6" ry="2.2" style="fill:var(--blush)" stroke="none"/><ellipse cx="50" cy="35.5" rx="3.6" ry="2.2" style="fill:var(--blush)" stroke="none"/>
+  </svg>
+  <div class="s-word"><span>M</span><span>e</span><span>a</span><span>l</span><span>c</span><span>a</span><span>t</span><i class="s-caret"></i></div>
+  <div class="s-tag"></div>
+</div>
 <main id="view"></main>
 <nav class="tabs" id="tabs"></nav>
 <div id="sheet-root"></div>
