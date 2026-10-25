@@ -97,6 +97,10 @@ body.en .meal-label{font-size:14.5px}
 .av{width:17px;height:17px}
 .swap-in{animation:swapIn 220ms var(--ease-out)}
 @keyframes swapIn{from{opacity:0;filter:blur(3px)}to{opacity:1;filter:none}}
+#view.slide-l{animation:slideL 200ms var(--ease-out)}
+#view.slide-r{animation:slideR 200ms var(--ease-out)}
+@keyframes slideL{from{opacity:0;transform:translateX(28px)}}
+@keyframes slideR{from{opacity:0;transform:translateX(-28px)}}
 
 .snack-h{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 8px}
 .snack-h b{font:400 18px var(--display)}
@@ -313,7 +317,7 @@ textarea.mono{font:13.5px/1.5 var(--body);letter-spacing:0}
 
 @media (prefers-reduced-motion:reduce){
   .sheet{transition:none}
-  .swap-in{animation:none}
+  .swap-in,#view.slide-l,#view.slide-r{animation:none}
   :is(.ghost,.solid,.cam,.chip,.cand,.icon-btn,.cell,.mprow,.item,.rcard){transition:none}
 }
 

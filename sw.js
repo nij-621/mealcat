@@ -1,5 +1,5 @@
 // Mealcat SW — network first (updates land right away), cache fallback for offline
-const CACHE = 'mealcat-v1.6'; // app.js의 VERSION과 같이 올림
+const CACHE = 'mealcat-v1.7'; // app.js의 VERSION과 같이 올림
 const SHELL = ['./', './index.html', './style.css', './app.js', './zip.js', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -1,7 +1,7 @@
 // Mealcat — 주간 식단 계획 + 사진 기록 (서버·AI 없음, 데이터는 이 기기 IndexedDB)
 'use strict';
 // 버전: sw.js의 CACHE와 같이 올림. 0.1씩, v1.9 다음은 v2.0
-const VERSION = '1.6';
+const VERSION = '1.7';
 
 /* ───────── 작은 도구 ───────── */
 const $ = s => document.querySelector(s);
@@ -1292,4 +1292,15 @@ const COACH = `너는 내 식단 코치야. 나는 매주 주말에 장을 본 �
   navigator.storage?.persist?.();
   document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); else if (S.tab === 'today' && S.day < todayStr() && !S.sheet) { S.day = todayStr(); render(); } });
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
+  // 오늘 탭: 옆으로 밀면 전날·다음 날 (간식 칩 줄은 제외 — 그 줄은 가로 스크롤)
+  const view = $('#view'); let sw = null;
+  view.addEventListener('touchstart', e => { sw = S.tab === 'today' && !S.sheet && e.touches.length === 1 && !e.target.closest('.chips') ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
+  view.addEventListener('touchend', e => {
+    if (!sw) return;
+    const dx = e.changedTouches[0].clientX - sw.x, dy = e.changedTouches[0].clientY - sw.y; sw = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    S.day = addDays(S.day, dx < 0 ? 1 : -1); render();
+    view.classList.remove('slide-l', 'slide-r'); void view.offsetWidth; view.classList.add(dx < 0 ? 'slide-l' : 'slide-r');
+  }, { passive: true });
+  view.addEventListener('animationend', e => { if (e.target === view) view.classList.remove('slide-l', 'slide-r'); });
 })();
