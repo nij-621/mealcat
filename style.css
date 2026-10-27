@@ -146,6 +146,7 @@ body.en .cell .nm{font-size:15.5px}
 .cell.empty .nm{color:var(--line);font:400 18px var(--display)}
 .cell .ok{position:absolute;right:4px;top:4px;width:15px;height:15px}
 .cell.split{padding:0 6px 0 5px}
+.cell.split:has(.ok) .half:first-child{padding-right:14px}
 .half{flex:1;display:flex;align-items:center;gap:3px;min-height:0;min-width:0}
 .half + .half{border-top:1.4px dashed var(--line)}
 .half .nm{font:700 15px/1 var(--pen);letter-spacing:var(--pen-track);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -1,7 +1,7 @@
 // Mealcat — 주간 식단 계획 + 사진 기록 (서버·AI 없음, 데이터는 이 기기 IndexedDB)
 'use strict';
 // 버전: sw.js의 CACHE와 같이 올림. 0.1씩, v1.9 다음은 v2.0
-const VERSION = '1.9';
+const VERSION = '2.0';
 
 /* ───────── 작은 도구 ───────── */
 const $ = s => document.querySelector(s);
@@ -269,7 +269,10 @@ function cell(s, k, sl, past) {
     const b = sl.a.s === 'changed' ? `<span class="badge">${t('바꿈', 'Changed')}</span>` : sl.a.s === 'out' ? `<span class="badge out">${t('외식', 'Out')}</span>` : '';
     return `<button class="cell pen photo${span}" ${attrs} aria-label="${esc(sl.a.s === 'out' ? outL(sl.a) : m(sl.a.m || sl.p))}">${pimg(sl.a.photo)}${b}</button>`;
   }
-  if (sl.h != null) return `<button class="cell pen split${span}" ${attrs}><span class="half">${ic('me', 'av')}<span class="nm">${esc(m(sl.p)) || '—'}</span></span><span class="half">${ic('him', 'av')}<span class="nm">${esc(m(sl.h)) || '—'}</span></span>${sl.n ? `<span class="memo">${esc(sl.n)}</span>` : ''}</button>`;
+  if (sl.h != null) {
+    const mine = sl.a?.s ? (sl.a.s === 'out' ? outL(sl.a) : m(sl.a.m || sl.p)) : m(sl.p);
+    return `<button class="cell pen split${span}" ${attrs}><span class="half">${ic('me', 'av')}<span class="nm">${esc(mine) || '—'}</span></span><span class="half">${ic('him', 'av')}<span class="nm">${esc(m(sl.h)) || '—'}</span></span>${sl.n ? `<span class="memo">${esc(sl.n)}</span>` : ''}${sl.a?.s ? ic('i-check', 'ok') : ''}</button>`;
+  }
   const pr = prepOf(s, sl.pp);
   const name = sl.a?.s ? (sl.a.s === 'out' ? OUT : sl.a.m || sl.p) : sl.p;
   const memo = sl.n ? `<span class="memo">${esc(sl.n)}</span>` : '';
