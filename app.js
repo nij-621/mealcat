@@ -1,7 +1,7 @@
 // Mealcat — 주간 식단 계획 + 사진 기록 (서버·AI 없음, 데이터는 이 기기 IndexedDB)
 'use strict';
 // 버전: sw.js의 CACHE와 같이 올림. 0.1씩, v1.9 다음은 v2.0
-const VERSION = '2.0';
+const VERSION = '2.1';
 
 /* ───────── 작은 도구 ───────── */
 const $ = s => document.querySelector(s);
@@ -70,7 +70,7 @@ let state = {
   menus: { B: [], F: [], L: [], D: [] }, recipes: [], snacks: ['커피', '요거트', '사과', '과자'], habits: [],
   weeks: {}, fridge: [], backupAt: null, importedAt: null
 };
-const S = { tab: 'today', day: todayStr(), weekOf: mondayOf(todayStr()), sub: 'grid', mt: 'menus', rq: '', rf: 'all', sheet: null };
+const S = { tab: 'today', day: todayStr(), weekOf: mondayOf(todayStr()), sub: 'grid', mt: 'menus', rq: '', mq: '', rf: 'all', sheet: null };
 let saveT;
 const save = () => { clearTimeout(saveT); saveT = setTimeout(() => kvSet('state', state), 250); };
 const flush = () => { clearTimeout(saveT); return kvSet('state', state); };
@@ -153,7 +153,7 @@ function vToday() {
   for (const k of slotsOf(s)) h += mealCard(s, k);
   const sn = d?.snacks || [];
   h += `<div class="snack-h"><b>${t('간식', 'Snacks')}</b><span>${t('누르면 지금 시각으로 남아요', 'Tap to log it now')}</span></div>`;
-  if (sn.length) h += `<div class="snack-log">${sn.map((x, i) => `<button data-a="snack-del" data-v="${i}" aria-label="${t('지우기', 'Remove')}">${ic(snackIcon(x.n))}${esc(m(x.n))} <em>${hhmm(x.t)}</em></button>`).join('')}</div>`;
+  if (sn.length) h += `<div class="snack-log">${sn.map((x, i) => `<button data-a="snack-edit" data-v="${i}" aria-label="${t('시간 바꾸기·지우기', 'Change time or remove')}">${ic(snackIcon(x.n))}${esc(m(x.n))} <em>${hhmm(x.t)}</em></button>`).join('')}</div>`;
   h += `<div class="chips">${state.snacks.map(n => `<button class="chip pen" data-a="snack" data-v="${esc(n)}">${ic(snackIcon(n))}${esc(m(n))}</button>`).join('')}
     <button class="chip pen add" data-a="snack-new">${t('+ 직접 쓰기', '+ Write one')}</button></div>`;
   return h;
@@ -372,14 +372,21 @@ function vMenus() {
   if (S.mt === 'fridge') return h + vFridge();
   if (!state.importedAt && !state.recipes.length) h += welcome();
   if (S.mt === 'menus') {
+    const mq = S.mq.trim().toLowerCase(), hit = s => !mq || s.join(' ').toLowerCase().includes(mq);
+    h += `<div class="field pen">${ic('i-search')}<input data-in="mq" value="${esc(S.mq)}" placeholder="${t('메뉴 이름으로 찾기', 'Search menus')}" enterkeyhint="search"></div>`;
+    let found = 0;
     for (const [k, ko, en] of [['B', '아침 기본', 'Breakfast base'], ['F', '과일', 'Fruit'], ['L', '점심', 'Lunch'], ['D', '저녁', 'Dinner']]) {
-      const list = [...state.menus[k]].sort((a, b) => (b.n || 0) - (a.n || 0));
+      const list = state.menus[k].filter(x => hit([x.name, x.en || '', m(x.name), ...(x.aka || [])])).sort((a, b) => (b.n || 0) - (a.n || 0));
+      found += list.length; if (mq && !list.length) continue;
       h += `<div class="sec"><b>${t(ko, en)}</b><span>${list.length}</span><button class="today-link" style="margin-left:auto" data-a="menu-add" data-v="${k}">${t('+ 추가', '+ Add')}</button></div>
         ${list.map(x => `<div class="item pen soft"><button class="nm" data-a="menu-ren" data-v="${esc(x.name)}" aria-label="${t('이름 고치기', 'Rename')} ${esc(m(x.name))}">${esc(m(x.name))}${ic('i-pen', 'p')}</button><span class="n">${x.n || 0}${t('회', '×')}</span>
           <button class="x" data-a="menu-del" data-k="${k}" data-v="${esc(x.name)}" aria-label="${t('지우기', 'Remove')}">${ic('i-x', 'p')}</button></div>`).join('')}`;
     }
-    h += `<div class="sec"><b>${t('간식 칩', 'Snack chips')}</b><button class="today-link" style="margin-left:auto" data-a="snack-new">${t('+ 추가', '+ Add')}</button></div>
-      <div class="base-row">${state.snacks.map(n => `<button class="chip pen" data-a="snack-chip-del" data-v="${esc(n)}">${ic(snackIcon(n))}${esc(m(n))} ${ic('i-x', 'p')}</button>`).join('')}</div>`;
+    const chips = state.snacks.filter(n => hit([n, m(n)]));
+    found += chips.length;
+    if (mq && !found) h += `<p class="muted small" style="margin-top:14px">${t('찾는 메뉴가 없어요.', 'No menus match.')}</p>`;
+    if (!mq || chips.length) h += `<div class="sec"><b>${t('간식 칩', 'Snack chips')}</b><button class="today-link" style="margin-left:auto" data-a="snack-new">${t('+ 추가', '+ Add')}</button></div>
+      <div class="base-row">${chips.map(n => `<button class="chip pen" data-a="snack-chip-del" data-v="${esc(n)}">${ic(snackIcon(n))}${esc(m(n))} ${ic('i-x', 'p')}</button>`).join('')}</div>`;
     return h;
   }
   const q = S.rq.trim();
@@ -512,6 +519,13 @@ function shFitem() {
   <div class="shelf">${SHELF.map(([v, ko, en]) => `<button class="pen${on(v) ? ' on' : ' soft'}" data-a="fi-days" data-v="${v}">${t(ko, en)}</button>`).join('')}</div>
   <div class="${x ? 'two' : ''}" style="margin-top:12px">${x ? `<button class="ghost pen" data-a="fused" data-v="${x.id}">${ic('i-check')}${t('다 씀', 'Used up')}</button>` : ''}<button class="solid" style="height:44px" data-a="fi-save">${t('저장', 'Save')}</button></div>`;
 }
+/* 간식 기록: 시간 바꾸기·지우기 */
+function shSnack() {
+  const P = S.sheet, x = getDay(P.date).snacks[P.i] || { n: '' };
+  return `<div class="sh-top"><div><b>${esc(m(x.n))}</b><p>${dateL(P.date)}</p></div>${xBtn()}</div>
+  <div class="field pen" style="margin-top:12px">${ic('i-clock')}<input type="time" data-in="snack-t" value="${P.tm}"></div>
+  <div class="two" style="margin-top:12px"><button class="ghost pen" data-a="snack-del">${ic('i-x')}${t('지우기', 'Remove')}</button><button class="solid" style="height:44px" data-a="snack-save">${t('저장', 'Save')}</button></div>`;
+}
 
 /* ───────── 시트 ───────── */
 function openSheet(sheet) { S.sheet = sheet; renderSheet(true); }
@@ -522,7 +536,7 @@ function closeSheet() {
   setTimeout(() => { if (!S.sheet) $('#sheet-root').innerHTML = ''; }, 300);
 }
 function renderSheet(fresh) {
-  const root = $('#sheet-root'); const html = { pick: shPick, recipe: shRecipe, radd: shRecipeAdd, settings: shSettings, ask: shAsk, fpaste: shFridgePaste, fitem: shFitem, photo: shPhoto }[S.sheet.type]();
+  const root = $('#sheet-root'); const html = { pick: shPick, recipe: shRecipe, radd: shRecipeAdd, settings: shSettings, ask: shAsk, fpaste: shFridgePaste, fitem: shFitem, photo: shPhoto, snack: shSnack }[S.sheet.type]();
   let sh = $('.sheet');
   if (fresh || !sh) {
     root.innerHTML = `<div class="dim" data-a="close"></div><div class="sheet" role="dialog" aria-modal="true"><div class="in-w"></div></div>`;
@@ -823,7 +837,14 @@ const A = {
   },
 
   snack: v => { getDay(S.day).snacks.push({ n: v, t: S.day === todayStr() ? Date.now() : parse(S.day).setHours(15) }); save(); render(); const b = [...document.querySelectorAll('[data-a="snack"]')].find(x => x.dataset.v === v); b?.classList.add('just'); setTimeout(() => b?.classList.remove('just'), 900); },
-  'snack-del': v => { const d = getDay(S.day); const x = d.snacks[+v]; if (!x || !confirm(t(`${x.n} 기록을 지울까요?`, `Remove ${x.n}?`))) return; d.snacks.splice(+v, 1); save(); render(); },
+  'snack-edit': v => { const x = getDay(S.day).snacks[+v]; if (x) openSheet({ type: 'snack', date: S.day, i: +v, tm: hhmm(x.t) }); },
+  'snack-save': () => {
+    const P = S.sheet, d = getDay(P.date), x = d.snacks[P.i]; if (!x) return closeSheet();
+    const [h, mi] = (P.tm || '').split(':').map(Number);
+    if (!isNaN(h) && !isNaN(mi)) { x.t = parse(P.date).setHours(h, mi, 0, 0); d.snacks.sort((a, b) => a.t - b.t); }
+    save(); closeSheet(); render();
+  },
+  'snack-del': () => { const P = S.sheet, d = getDay(P.date), x = d.snacks[P.i]; if (x) d.snacks.splice(P.i, 1); save(); closeSheet(); render(); if (x) toast(t(`${x.n} 기록을 지웠어요`, `Removed ${x.n}`)); },
   'snack-new': async () => {
     const n = (await ask(t('간식 이름', 'Snack name'), t('예: 견과류', 'e.g. nuts')))?.trim(); if (!n) return;
     if (!state.snacks.includes(n)) state.snacks.push(n);
@@ -956,10 +977,12 @@ document.addEventListener('input', e => {
   const el = e.target, k = el.dataset?.in; if (!k) return;
   if (k === 'memo') { getWeek(el.dataset.v).memo = el.value; save(); const f = $('#found'); if (f) f.innerHTML = foundHTML(memoFound(el.value)); }
   else if (k === 'rq') { S.rq = el.value; const pos = el.selectionStart; render(); const n = $('[data-in="rq"]'); n.focus(); n.setSelectionRange(pos, pos); }
+  else if (k === 'mq') { S.mq = el.value; const pos = el.selectionStart; render(); const n = $('[data-in="mq"]'); n.focus(); n.setSelectionRange(pos, pos); }
   else if (k === 'pq') { S.sheet.q = el.value; const pos = el.selectionStart; renderSheet(); const n = $('[data-in="pq"]'); n.focus(); n.setSelectionRange(pos, pos); }
   else if (k === 'slot-note') { const sl = getSlot(S.sheet.date, S.sheet.k), v = el.value.trim(); if (v) sl.n = v; else delete sl.n; save(); }
   else if (k === 'fp') { S.sheet.text = el.value; const p = $('#fp-parse'); if (p) p.innerHTML = fpPreview(el.value); }
   else if (k === 'fi-name' || k === 'fi-q') S.sheet[k.slice(3)] = el.value;
+  else if (k === 'snack-t') S.sheet.tm = el.value;
   else if (k === 'name-me' || k === 'name-him') { state.names[k.slice(5)] = el.value.trim() || (k === 'name-me' ? '나' : '남편'); save(); }
 });
 document.addEventListener('keydown', e => {
