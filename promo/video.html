@@ -50,7 +50,13 @@ html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:var(--p
 <script>
 'use strict';
 /* ───────── 타임라인: 화면과 소리가 함께 쓰는 시각(초) ───────── */
-const FPS = 60, DUR = 40, BEAT = 0.5; // 120 BPM, 장면 전환·탭·도장은 모두 박자 위
+const EN = new URLSearchParams(location.search).get('lang') === 'en', tx = (ko, en) => EN ? en : ko, SD = EN ? 'shots-en/' : 'shots/';
+const FPS = 60, DUR = EN ? 30 : 40, BEAT = 0.5;
+// 영어판은 같은 장면을 30초로: [원래 시각, 영상 시각] 마디점 사이를 늘였다 줄임 (전환·아이콘 등장은 박자 위)
+const KN = EN ? [[0, 0], [5, 4], [9, 7], [15, 11], [21, 15], [26, 18], [31, 22], [35, 26], [36, 27], [40, 30]] : [[0, 0], [40, 40]];
+const interp = (x, xs, ys) => { let i = 1; while (i < xs.length - 1 && x > xs[i]) i++; return ys[i - 1] + (ys[i] - ys[i - 1]) * (x - xs[i - 1]) / (xs[i] - xs[i - 1]); };
+const WARP = t => interp(t, KN.map(k => k[1]), KN.map(k => k[0])); // 영상 시각 → 원래 시각
+const U = t => interp(t, KN.map(k => k[0]), KN.map(k => k[1]));    // 원래 시각 → 영상 시각 // 120 BPM, 장면 전환·탭·도장은 모두 박자 위
 const CUTS = [5, 9, 15, 21, 26, 31, 35];
 const T = {
   catIn: 0.1, wordAt: 1.0, wink: 2.0, tag: 1.8,
@@ -64,14 +70,14 @@ const T = {
 };
 const CAPS = [
   // [시작, 끝, 글, y] — 끝까지 최소 3초 이상 화면에 머묾
-  [5.15, 8.85, '오늘 뭐 먹지?', 200],
-  [9.25, 14.9, '한 주 식단을 한눈에', 170],
-  [15.25, 20.9, '먹은 건 사진 한 장, 찰칵!', 170],
-  [21.25, 25.9, '간식은 톡! 시간까지 쏙', 170],
-  [26.25, 30.9, '남편이랑 메뉴가 달라도 OK', 170],
-  [31.25, 34.95, '주말엔 다음 주 준비 끝!', 170],
+  [5.15, 8.85, tx('오늘 뭐 먹지?', 'What should we eat?'), 200],
+  [9.25, 14.9, tx('한 주 식단을 한눈에', 'Your week at a glance'), 170],
+  [15.25, 20.9, tx('먹은 건 사진 한 장, 찰칵!', 'Ate it? Snap a photo!'), 170],
+  [21.25, 25.9, tx('간식은 톡! 시간까지 쏙', 'Snacks? Just one tap'), 170],
+  [26.25, 30.9, tx('남편이랑 메뉴가 달라도 OK', 'Different menus? No problem'), 170],
+  [31.25, 34.95, tx('주말엔 다음 주 준비 끝!', 'Weekend prep, done!'), 170],
 ];
-const SUBS = [[11.0, 14.9, '평일 3끼 · 주말엔 브런치까지', 300], [27.6, 30.9, '계획표는 이미지 한 장으로 공유', 300]];
+const SUBS = [[11.0, 14.9, tx('평일 3끼 · 주말엔 브런치까지', 'Breakfast · Lunch · Dinner'), 300], [27.6, 30.9, tx('계획표는 이미지 한 장으로 공유', 'Share the plan as one image'), 300]];
 
 /* ───────── 작은 도구 ───────── */
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -95,7 +101,7 @@ async function setup() {
   const doc = new DOMParser().parseFromString(await (await fetch('../index.html')).text(), 'text/html');
   document.getElementById('defs').append(doc.querySelector('body > svg'));
   const splashCat = doc.querySelector('#splash svg').outerHTML;
-  R = await (await fetch('shots/rects.json')).json();
+  R = await (await fetch(SD + 'rects.json')).json();
   const S = document.getElementById('stage');
 
   /* 공통 배경 낙서 (양옆 여백에서 둥실) */
@@ -108,7 +114,7 @@ async function setup() {
   const cat = h('div', 'abs', splashCat.replace('width="74" height="86"', 'width="430" height="500"'), s1);
   const word = h('div', 'cap', [...'Mealcat'].map(c => `<span>${c}</span>`).join('') + '<i style="display:inline-block;width:10px;height:150px;border-radius:5px;background:var(--ink);margin-left:8px;vertical-align:-12px"></i>', s1);
   word.style.cssText += 'font-size:190px;top:1180px';
-  const tag = h('div', 'sub', '이번 주도 잘 먹어요', s1); tag.style.cssText += 'top:1430px;font-size:72px;color:var(--ink)';
+  const tag = h('div', 'sub', tx('이번 주도 잘 먹어요', 'Eat well this week'), s1); tag.style.cssText += 'top:1430px;font-size:72px;color:var(--ink)';
   const ring = ['bowl', 'egg', 'apple', 'coffee', 'cookie', 'onigiri', 'pizza', 'fish'].map(id => h('div', 'abs', art(id, 130), s1));
 
   /* S2 오늘 뭐 먹지? */
@@ -123,7 +129,7 @@ async function setup() {
   const phone = h('div', 'phone', '<div class="screen"><div class="shot"></div><div class="notch"></div></div>', S); phone.style.zIndex = 5;
   const screen = phone.querySelector('.screen'), shot = phone.querySelector('.shot');
   const SHOTS = ['week', 'today_before', 'today_photo', 'today_snack', 'prep'];
-  const imgs = Object.fromEntries(SHOTS.map(n => { const i = h('img', '', null, shot); i.src = `shots/${n}.png`; i.style.cssText = 'position:absolute;left:0;top:0;opacity:0'; return [n, i]; }));
+  const imgs = Object.fromEntries(SHOTS.map(n => { const i = h('img', '', null, shot); i.src = `${SD}${n}.png`; i.style.cssText = 'position:absolute;left:0;top:0;opacity:0'; return [n, i]; }));
   const layer = h('div', 'layer', '', shot); // 스크린샷 좌표(×3)로 얹는 것들
   const covers = R.rows.map(([x, y, w, hh]) => { const e = h('div', 'abs', '', layer); e.style.cssText = `left:0;top:${y * 3 - 6}px;width:1170px;height:${hh * 3 + 12}px;background:#fff`; return e; });
   const checks = R.steps.slice(0, 4).map(([x, y, w, hh]) => { const e = h('div', 'abs', `<svg viewBox="0 0 40 40" width="${w * 3 + 24}"><circle cx="20" cy="20" r="18" fill="#2f2c2b"/><path d="M11 20.5l6 6L29 13" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>`, layer); e.style.left = (x * 3 - 12) + 'px'; e.style.top = (y * 3 - 12) + 'px'; return e; });
@@ -135,8 +141,8 @@ async function setup() {
   const zz = [0, 1].map(i => { const e = h('div', 'z', i ? 'z' : 'Z', S); e.style.zIndex = 6; return e; });
 
   /* S4 찰칵 */
-  const pol = h('div', 'polaroid', '<img src="shots/food_bibim.jpg"><b>비빔밥 12:40</b>', S); pol.style.zIndex = 30;
-  const boom = h('div', 'boom', '찰칵!', S); boom.style.zIndex = 31;
+  const pol = h('div', 'polaroid', `<img src="shots/food_bibim.jpg"><b>${tx('비빔밥', 'Bibimbap')} 12:40</b>`, S); pol.style.zIndex = 30;
+  const boom = h('div', 'boom', tx('찰칵!', 'Snap!'), S); boom.style.zIndex = 31;
   const flash = h('div', 'flash', '', S);
   const sparks = Array.from({ length: 10 }, () => { const e = h('div', 'spark', `<svg viewBox="0 0 20 20" width="26"><path d="M10 0l2.6 7.4L20 10l-7.4 2.6L10 20l-2.6-7.4L0 10l7.4-2.6z" fill="#f5b9b2"/></svg>`, S); e.style.zIndex = 32; return e; });
   const pops = ['apple', 'coffee', 'cookie', 'yogurt'].map(id => { const e = h('div', 'abs', art(id, 150), S); e.style.zIndex = 33; return e; });
@@ -146,13 +152,13 @@ async function setup() {
   const s6 = h('div', 'scene'); s6.style.zIndex = 2;
   h('div', 'bg', '', s6).style.background = 'var(--blush-soft)';
   const me = h('div', 'abs', art('me', 300), s6), him = h('div', 'abs', art('him', 300), s6);
-  const lme = h('div', 'lab', '나', s6), lhim = h('div', 'lab', '남편', s6);
+  const lme = h('div', 'lab', tx('나', 'Me'), s6), lhim = h('div', 'lab', tx('남편', 'Husband'), s6);
   const hearts = [0, 1, 2].map(() => h('div', 'heart', '♥', s6));
-  const himCard = h('div', 'card', '<img src="shots/him.png">', s6); himCard.style.width = '760px';
+  const himCard = h('div', 'card', `<img src="${SD}him.png">`, s6); himCard.style.width = '760px';
   const shareIc = h('div', 'abs', art('i-share', 150), s6);
 
   /* S7 다음 주 준비 */
-  const coach = h('div', 'card', '<img src="shots/coach.jpg">', S); coach.style.cssText += 'width:400px;z-index:20;border-radius:20px';
+  const coach = h('div', 'card', `<img src="${EN ? SD + 'history.png' : 'shots/coach.jpg'}">`, S); coach.style.cssText += 'width:400px;z-index:20;border-radius:20px';
 
   /* S8 끝 */
   const s8 = h('div', 'scene'); s8.style.zIndex = 3;
@@ -161,7 +167,7 @@ async function setup() {
   const mos = MOS.map((k, i) => { const e = h('div', 'plate', `<img src="shots/food_${k}.jpg">`, s8); e.style.width = e.style.height = '300px'; return e; });
   const icon = h('div', 'abs', '<img src="../icon-512.png" width="520" style="display:block;border-radius:120px;box-shadow:0 30px 70px rgba(47,44,43,.25)">', s8);
   const word8 = h('div', 'cap', [...'Mealcat'].map(c => `<span>${c}</span>`).join(''), s8); word8.style.cssText += 'font-size:170px;top:1170px';
-  const tag8 = h('div', 'cap', [...'오늘도 맛있게, 냥!'].map(c => `<span>${c}</span>`).join(''), s8); tag8.style.cssText += 'font-size:96px;top:1400px';
+  const tag8 = h('div', 'cap', [...tx('오늘도 맛있게, 냥!', 'Eat well, meow!')].map(c => `<span>${c}</span>`).join(''), s8); tag8.style.cssText += 'font-size:96px;top:1400px';
   const flowers = ['daisy', 'tulip', 'sprig', 'daisy', 'tulip', 'sprig'].map(id => h('div', 'abs', art(id, 130), s8));
 
   /* 자막 */
@@ -174,6 +180,8 @@ async function setup() {
   const txt = document.body.innerText + 'Mealcat오늘도맛있게냥!찰칵+1나남편';
   await Promise.all(['400 90px Jua', '700 90px Gaegu', '400 50px "Gowun Dodum"'].map(f => document.fonts.load(f, txt)));
   await document.fonts.ready;
+  // 긴 자막(영어)은 화면 폭에 맞게 줄임
+  for (const { e } of caps) { const sp = e.querySelectorAll('span'), w = sp[sp.length - 1].offsetLeft + sp[sp.length - 1].offsetWidth - sp[0].offsetLeft; if (w > 1000) e.style.fontSize = 92 * 1000 / w + 'px'; }
   await Promise.all([...document.images].map(i => i.decode().catch(() => {})));
 }
 
@@ -198,6 +206,7 @@ function crossShot(a, b, p, s, x, y) { const m = setShot(a, s, x, y); IMG.imgs[b
 
 let thumbC = [400, 800], chipC = [400, 1150];
 function seek(t) {
+  t = WARP(t);
   const I = IMG, sc = scene(t);
   // 손그림 선이 살짝 꿈틀(boil) — 앱의 펜 필터 씨앗을 1/8초마다 바꿈
   document.querySelector('#pen feTurbulence').setAttribute('seed', 1 + Math.floor(t * 8) % 4);
@@ -370,7 +379,7 @@ function seek(t) {
 const CAT = [
   // [시각, 파일, 볼륨] — 진짜 고양이 소리 (ESC-50 / Freesound 녹음)
   [0.45, 'meow_a', 1], [5.55, 'meow_q', .9], [8.02, 'mew4', 1], [12.6, 'mew5', .85], [18.02, 'mew1', 1],
-  [22.62, 'mew2', .95], [26.6, 'meow_duo', .9], [33.42, 'mew3', .95], [36.05, 'meow_b', 1], [36.5 + 9 * .045 + .05, 'mew5', 1], [38.4, 'meow_long', .85],
+  [22.62, 'mew2', .95], [26.6, 'meow_duo', .9], [33.42, 'mew3', .95], [36.05, 'meow_b', 1], [36.5 + tx(9, 10) * .045 + .05, 'mew5', 1], [38.4, 'meow_long', .85],
 ];
 async function renderAudio() {
   const SR = 48000, ctx = new OfflineAudioContext(2, SR * DUR, SR);
@@ -415,28 +424,31 @@ async function renderAudio() {
   const PROG = [[48, [60, 64, 67]], [45, [57, 60, 64]], [41, [57, 60, 65]], [43, [55, 59, 62]]];
   const MEL = [[76, 0, 79, 0, 81, 79, 76, 0], [72, 0, 76, 0, 74, 72, 69, 0], [69, 72, 0, 77, 76, 0, 72, 0], [74, 0, 79, 0, 71, 74, 79, 0],
     [76, 79, 81, 0, 84, 81, 79, 0], [72, 0, 76, 79, 76, 0, 72, 0], [69, 72, 77, 0, 81, 79, 77, 0], [74, 76, 79, 0, 81, 0, 83, 0]];
-  for (let bar = 0; bar < 18; bar++) {
+  const H = U(T.icon); // 끝 '쾅' 시각
+  for (let bar = 0; bar * 2 < H; bar++) {
     const b0 = bar * 2, [root, ch] = PROG[bar % 4], full = bar >= 2, mel = MEL[bar % 8];
     for (let beat = 0; beat < 4; beat++) {
-      const t = b0 + beat * BEAT;
+      const t = b0 + beat * BEAT; if (t >= H) break;
       if (full) { if (beat % 2 === 0) kick(t); else clap(t); }
       if (full || beat === 0) bass(t, beat === 2 ? root + 7 : root, .35, full ? .42 : .3);
       if (beat === 0) strum(t, ch, full ? .07 : .06, .5); else if (beat % 2) strum(t, ch, .08, .22, -1);
       if (full) { hat(t + .25, .05); if (bar % 2) hat(t, .03, -.3); }
       if (full && beat === 3) bass(t + .25, root + 12, .15, .28);
     }
-    mel.forEach((m, i) => { if (m) (bar < 2 ? glock : marimba)(b0 + i * .25, m, bar < 2 ? .1 : .2, music, .15); });
-    if (bar >= 10 && bar < 16) mel.forEach((m, i) => { if (m && i % 2 === 0) glock(b0 + i * .25, m + 12, .05, music, -.3); });
+    mel.forEach((m, i) => { if (m && b0 + i * .25 < H) (bar < 2 ? glock : marimba)(b0 + i * .25, m, bar < 2 ? .1 : .2, music, .15); });
+    if (bar >= 10 && bar < 16) mel.forEach((m, i) => { if (m && i % 2 === 0 && b0 + i * .25 < H) glock(b0 + i * .25, m + 12, .05, music, -.3); });
   }
   // 34~35초 필인: 손뼉 16분음표로 쌓기
-  for (let i = 0; i < 8; i++) clap(34.5 + i * .0625, .1 + i * .025);
+  for (let i = 0; i < 8; i++) clap(H - 1.5 + i * .0625, .1 + i * .025);
   // 끝: 36초 '쾅' 화음 → 38초 마지막 화음이 울리며 끝
-  kick(36); crash(36, .3); bass(36, 36, 1.6, .5); strum(36, [60, 64, 67, 72], .12, 1.4);
-  [[36.5, 79], [37, 81], [37.25, 79], [37.5, 76], [38, 84]].forEach(([t, m]) => marimba(t, m, .2));
-  strum(38, [60, 64, 67, 74, 76], .1, 2.2); bass(38, 36, 2, .4); glock(38, 88, .1); glock(38.75, 91, .07);
-  for (let i = 0; i < 4; i++) hat(36 + i * .5 + .25, .03);
+  kick(H); crash(H, .3); bass(H, 36, 1.6, .5); strum(H, [60, 64, 67, 72], .12, 1.4);
+  [[.5, 79], [1, 81], [1.25, 79], [1.5, 76], [2, 84]].forEach(([t, m]) => marimba(H + t, m, .2));
+  strum(H + 2, [60, 64, 67, 74, 76], .1, 2.2); bass(H + 2, 36, 2, .4); glock(H + 2, 88, .1); glock(H + 2.75, 91, .07);
+  for (let i = 0; i < 4; i++) hat(H + i * .5 + .25, .03);
 
-  /* 화면에 맞춘 효과음 */
+  /* 화면에 맞춘 효과음 — 원래 시각으로 적고, 영어판에선 U()로 옮김 */
+  const at = f => (t, ...a) => f(U(t), ...a);
+  ((pop, tick, whoosh, shutter, sparkle, boing, ding, marimba) => {
   pop(T.catIn, 380, .5); sparkle(T.catIn + .1, 84, .06);
   for (let i = 0; i < 7; i++) tick(T.wordAt + i * .09, .2, 2200 + i * 120);
   sparkle(T.wink, 88, .08);
@@ -459,8 +471,9 @@ async function renderAudio() {
   for (let i = 0; i < 16; i++) { pop(T.mosaic + i * .0625, 400 + i * 45, .22, ((i * 7) % 3 - 1) * .5); }
   boing(T.icon, 150, .45); sparkle(T.icon + .05, 84, .12); whoosh(T.icon - .45, .45, .35);
   for (let i = 0; i < 7; i++) tick(T.icon + .2 + i * .06, .15, 2400 + i * 100);
+  })(...[pop, tick, whoosh, shutter, sparkle, boing, ding, marimba].map(at));
   // 고양이 소리 + 음악 살짝 낮추기
-  for (const [t, name, v] of CAT) { const d = await cat(t, name, v); music.gain.setTargetAtTime(.38, t - .03, .03); music.gain.setTargetAtTime(.62, t + d * .9, .15); }
+  for (const [t0, name, v] of CAT) { const t = U(t0), d = await cat(t, name, v); music.gain.setTargetAtTime(.38, t - .03, .03); music.gain.setTargetAtTime(.62, t + d * .9, .15); }
   const buf = await ctx.startRendering();
   // WAV 16비트로
   const n = buf.length, out = new DataView(new ArrayBuffer(44 + n * 4)), w = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));

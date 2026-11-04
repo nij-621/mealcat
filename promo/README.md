@@ -1,6 +1,7 @@
 # Mealcat 소개 영상
 
 `mealcat-intro.mp4` — 40초, 1080×1920 세로, 60fps, 한국어, 소리 포함.
+`mealcat-intro-en.mp4` — 같은 장면을 30초로 줄인 영어판 (영어 앱 화면 `shots-en/`).
 
 - `capture.js` — 실제 앱에 한 주치 데이터를 넣고 화면을 찍음 → `shots/`
 - `food.js` — 영상·앱 사진 칸에 쓰는 음식 접시 그림 (캔버스)
@@ -12,6 +13,7 @@
     python3 -m http.server 8132 &
     node promo/capture.js
     node promo/render.js
+    VLANG=en node promo/capture.js && VLANG=en node promo/render.js   # 영어판
 
 ## 고양이 소리
 

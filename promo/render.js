@@ -3,15 +3,17 @@
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
 const fs = require('fs'), path = require('path');
-const FPS = 60, DUR = 40, OUT = path.join(__dirname, 'mealcat-intro.mp4'), TMP = process.env.TMPDIR || '/tmp';
+const EN = process.env.VLANG === 'en'; // 영어판(30초): VLANG=en
+const FPS = 60, OUT = path.join(__dirname, EN ? 'mealcat-intro-en.mp4' : 'mealcat-intro.mp4'), TMP = process.env.TMPDIR || '/tmp';
 (async () => {
   const b = await chromium.launch({ proxy: process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: 'localhost,127.0.0.1' } : undefined });
   const p = await b.newPage({ viewport: { width: 1080, height: 1920 } });
   p.on('pageerror', e => console.error('page error:', e.message));
-  await p.goto('http://localhost:8132/promo/video.html'); await p.evaluate(() => window.ready);
+  await p.goto('http://localhost:8132/promo/video.html' + (EN ? '?lang=en' : '')); await p.evaluate(() => window.ready);
+  const DUR = await p.evaluate(() => DUR);
   const stills = process.argv.slice(2).map(Number);
   if (stills.length) { // 미리보기 컷만
-    for (const t of stills) { await p.evaluate(t => seek(t), t); await p.screenshot({ path: path.join(TMP, `still-${t}.png`) }); }
+    for (const t of stills) { await p.evaluate(t => seek(t), t); await p.screenshot({ path: path.join(TMP, `still-${EN ? 'en-' : ''}${t}.png`) }); }
     return b.close();
   }
   const wav = path.join(TMP, 'mealcat-audio.wav');
