@@ -473,7 +473,8 @@ async function renderAudio() {
   for (let i = 0; i < 7; i++) tick(T.icon + .2 + i * .06, .15, 2400 + i * 100);
   })(...[pop, tick, whoosh, shutter, sparkle, boing, ding, marimba].map(at));
   // 고양이 소리 + 음악 살짝 낮추기
-  for (const [t0, name, v] of CAT) { const t = U(t0), d = await cat(t, name, v); music.gain.setTargetAtTime(.38, t - .03, .03); music.gain.setTargetAtTime(.62, t + d * .9, .15); }
+  // 영어판은 마지막 "meow!" 한 번만
+  for (const [t0, name, v] of EN ? [CAT[9]] : CAT) { const t = U(t0), d = await cat(t, name, v); music.gain.setTargetAtTime(.38, t - .03, .03); music.gain.setTargetAtTime(.62, t + d * .9, .15); }
   const buf = await ctx.startRendering();
   // WAV 16비트로
   const n = buf.length, out = new DataView(new ArrayBuffer(44 + n * 4)), w = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
