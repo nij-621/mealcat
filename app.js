@@ -1,7 +1,7 @@
 // Mealcat — 주간 식단 계획 + 사진 기록 (서버·AI 없음, 데이터는 이 기기 IndexedDB)
 'use strict';
 // 버전: sw.js의 CACHE와 같이 올림. 0.1씩, v1.9 다음은 v2.0
-const VERSION = '2.1';
+const VERSION = '2.2';
 
 /* ───────── 작은 도구 ───────── */
 const $ = s => document.querySelector(s);
@@ -240,7 +240,8 @@ function vWeek() {
       <div class="big" style="font-size:28px">${rangeL(mon)}</div></div>
     <div class="wk-btns"><button class="icon-btn pen" data-a="share-him" aria-label="${t('남편에게 공유', 'Share')}">${ic('i-share')}</button>
       <button class="prep-btn pen" data-a="prep">${ic('daisy')}${t('다음 주 준비', 'Next week')}${art('cat-peek', 'peek')}</button></div></div>
-  <div class="wk-stat">${w?.legacy ? t('메모앱에서 옮긴 계획 · ', 'Plan from my notes app · ') : ''}${statLine(mon)}</div>`;
+  <div class="wk-stat"><span>${w?.legacy ? t('메모앱에서 옮긴 계획 · ', 'Plan from my notes app · ') : ''}${statLine(mon)}</span>
+    <div class="vw pen" role="group" aria-label="${t('칸 보기', 'Cell view')}"><button class="${state.wkNames ? '' : 'on'}" data-a="wk-view" data-v="0">${t('사진', 'Photos')}</button><button class="${state.wkNames ? 'on' : ''}" data-a="wk-view" data-v="1">${t('이름', 'Names')}</button></div></div>`;
   if (!weekStats(mon).plans) {
     const prev = weekStats(addDays(mon, -7)).plans;
     h += `<div class="empty-week pen dash">${art('cat-sleep')}<div><p>${t('칸을 눌러 메뉴를 적어요.', 'Tap a slot to write a dish.')}</p>
@@ -265,13 +266,17 @@ function cell(s, k, sl, past) {
   const attrs = `data-a="pick" data-d="${s}" data-k="${k}"`;
   const lab = k === 'BR' || (isTwo(s) && k === 'D') ? `<span class="slot">${slotL(k)}</span>` : '';
   sl = sl || {};
-  if (sl.a?.photo) {
+  // 이름 보기(state.wkNames, 2026-11-08): 사진 칸도 글자 칸으로. 이름 붙일 게 없는 사진만 사진으로 남김
+  if (sl.a?.photo && (!state.wkNames || !(sl.a.s || sl.p || sl.h != null))) {
     const b = sl.a.s === 'changed' ? `<span class="badge">${t('바꿈', 'Changed')}</span>` : sl.a.s === 'out' ? `<span class="badge out">${t('외식', 'Out')}</span>` : '';
     return `<button class="cell pen photo${span}" ${attrs} aria-label="${esc(sl.a.s === 'out' ? outL(sl.a) : m(sl.a.m || sl.p))}">${pimg(sl.a.photo)}${b}</button>`;
   }
+  // 기록 표시: 사진 있으면 카메라, 없으면 체크. 바꾼 칸은 작은 "바꿈"(따로 칸은 자리가 없어 생략)
+  const done = sl.a?.photo ? ic('i-cam', 'ok') : sl.a?.s ? ic('i-check', 'ok') : '';
+  const chg = sl.a?.s === 'changed' ? `<span class="chg">${t('바꿈', 'Changed')}</span>` : '';
   if (sl.h != null) {
     const mine = sl.a?.s ? (sl.a.s === 'out' ? outL(sl.a) : m(sl.a.m || sl.p)) : m(sl.p);
-    return `<button class="cell pen split${span}" ${attrs}><span class="half">${ic('me', 'av')}<span class="nm">${esc(mine) || '—'}</span></span><span class="half">${ic('him', 'av')}<span class="nm">${esc(m(sl.h)) || '—'}</span></span>${sl.n ? `<span class="memo">${esc(sl.n)}</span>` : ''}${sl.a?.s ? ic('i-check', 'ok') : ''}</button>`;
+    return `<button class="cell pen split${span}" ${attrs}><span class="half">${ic('me', 'av')}<span class="nm">${esc(mine) || '—'}</span></span><span class="half">${ic('him', 'av')}<span class="nm">${esc(m(sl.h)) || '—'}</span></span>${sl.n ? `<span class="memo">${esc(sl.n)}</span>` : ''}${done}</button>`;
   }
   const pr = prepOf(s, sl.pp);
   const name = sl.a?.s ? (sl.a.s === 'out' ? OUT : sl.a.m || sl.p) : sl.p;
@@ -279,8 +284,8 @@ function cell(s, k, sl, past) {
   if (!name) return `<button class="cell pen soft empty${span}" ${attrs} aria-label="${slotL(k)}">${lab}<span class="nm">+</span>${memo}</button>`;
   const miss = past && !sl.a;
   const out = name === OUT;
-  return `<button class="cell pen${span}${miss ? ' miss' : ''}${out ? ' dash' : ''}" ${attrs}>${pr ? `<span class="prep">${prepL(pr.type)}</span>` : lab}<span class="nm">${esc(out ? outL(sl.a) : m(name))}</span>
-    ${memo}${miss ? `<span class="note">${t('기록 없음', 'Not logged')}</span>` : ''}${sl.a?.s ? ic('i-check', 'ok') : ''}</button>`;
+  return `<button class="cell pen${span}${miss ? ' miss' : ''}${out ? ' dash' : ''}" ${attrs}>${(top => chg ? `<span class="top">${top}${chg}</span>` : top)(pr ? `<span class="prep">${prepL(pr.type)}</span>` : lab)}<span class="nm">${esc(out ? outL(sl.a) : m(name))}</span>
+    ${memo}${miss ? `<span class="note">${t('기록 없음', 'Not logged')}</span>` : ''}${done}</button>`;
 }
 
 /* 다음 주 준비 */
@@ -425,12 +430,18 @@ const F_IC = [[/우유|요거트|요플레|크림/, 'yogurt'], [/달걀|계란|�
 const fIcon = n => (F_IC.find(([re]) => re.test(n)) || [0, 'carrot'])[1];
 
 /* 레시피 주재료 ↔ 냉장고 이름: 한쪽이 다른 쪽을 품으면 같은 것 (방울토마토 ⊃ 토마토) */
+// 같은 재료 = 한쪽이 다른 쪽으로 "끝날" 때만 (통마늘→마늘 ○, 새우칩→새우 ✕, 버터넛호박→버터 ✕, 고추장→고추 ✕).
+// 예외로 뒤에 고기 부위만 붙은 건 같은 재료 (새우살→새우, 닭가슴살→닭). 괄호 안은 무시 (2026-11-08)
+const fWords = n => n.replace(/\([^)]*\)/g, ' ').split(/\s+/).filter(w => w.length >= 2);
+const CUTS = /^(살|가슴살|다리살|안심|등심|목살|앞다리|뒷다리)$/;
+const sameIng = (a, b) => a.endsWith(b) || b.endsWith(a) || (a.startsWith(b) && CUTS.test(a.slice(b.length))) || (b.startsWith(a) && CUTS.test(b.slice(a.length)));
 function fridgeMatch(r, live) {
   const tags = (r.tags || []).filter(x => x.length >= 2), hit = [];
   let soon = false;
   for (const tg of tags) {
-    const f = live.find(x => x.name.includes(tg) || (x.name.length >= 2 && tg.includes(x.name.split(' ')[0])));
-    if (f) { hit.push(f.name.split(' ')[0]); if (fridgeLeft(f) <= 3) soon = true; }
+    let w;
+    const f = live.find(x => (w = fWords(x.name).find(y => sameIng(y, tg))));
+    if (f) { hit.push(w); if (fridgeLeft(f) <= 3) soon = true; }
   }
   return { hit: [...new Set(hit)], of: tags.length, soon };
 }
@@ -780,6 +791,7 @@ const A = {
   prep: () => { S.sub = 'prep'; scrollTo(0, 0); render(); },
   'go-week': v => { S.tab = 'week'; S.sub = 'grid'; S.weekOf = v; scrollTo(0, 0); render(); },
   'goto-day': v => { closeSheet(); S.tab = 'today'; S.day = v; scrollTo(0, 0); render(); },
+  'wk-view': v => { state.wkNames = v === '1'; save(); render(); },
   mt: v => { S.mt = v; render(); },
   rf: v => { S.rf = v; render(); },
   close: () => { const pick = S.sheet?.type === 'pick'; if (S.sheet?.type === 'ask' && askResolve) { askResolve(null); askResolve = null; } closeSheet(); if (pick) render(); },
@@ -973,12 +985,23 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]'); if (!el) return;
   const fn = A[el.dataset.a]; if (fn) { e.preventDefault(); fn(el.dataset.v, el); }
 });
+/* 검색창은 그대로 두고 앞뒤만 다시 그림 — 입력창을 새로 만들면 한글 조합이 끊겨 "ㅂ ㅏ ㅂ"이 됨 (2026-11-08) */
+function patchAround(box, html, el) {
+  const live = el.closest('.field'), tmp = document.createElement('div'); tmp.innerHTML = html;
+  const nf = tmp.querySelector(`[data-in="${el.dataset.in}"]`)?.closest('.field');
+  if (!live || live.parentNode !== box || !nf || nf.parentNode !== tmp) return false;
+  while (box.firstChild !== live) box.firstChild.remove();
+  while (live.nextSibling) live.nextSibling.remove();
+  while (tmp.firstChild !== nf) box.insertBefore(tmp.firstChild, live);
+  nf.remove(); live.after(...tmp.childNodes);
+  hydrate(); return true;
+}
+function reFocus(el, redraw) { const k = el.dataset.in, pos = el.selectionStart; redraw(); const n = $(`[data-in="${k}"]`); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }
 document.addEventListener('input', e => {
   const el = e.target, k = el.dataset?.in; if (!k) return;
   if (k === 'memo') { getWeek(el.dataset.v).memo = el.value; save(); const f = $('#found'); if (f) f.innerHTML = foundHTML(memoFound(el.value)); }
-  else if (k === 'rq') { S.rq = el.value; const pos = el.selectionStart; render(); const n = $('[data-in="rq"]'); n.focus(); n.setSelectionRange(pos, pos); }
-  else if (k === 'mq') { S.mq = el.value; const pos = el.selectionStart; render(); const n = $('[data-in="mq"]'); n.focus(); n.setSelectionRange(pos, pos); }
-  else if (k === 'pq') { S.sheet.q = el.value; const pos = el.selectionStart; renderSheet(); const n = $('[data-in="pq"]'); n.focus(); n.setSelectionRange(pos, pos); }
+  else if (k === 'rq' || k === 'mq') { S[k] = el.value; patchAround($('#view'), vMenus(), el) || reFocus(el, render); }
+  else if (k === 'pq') { S.sheet.q = el.value; const box = $('.sheet .in-w'); (box && patchAround(box, `<div class="grab"></div>${shPick()}`, el)) || reFocus(el, renderSheet); }
   else if (k === 'slot-note') { const sl = getSlot(S.sheet.date, S.sheet.k), v = el.value.trim(); if (v) sl.n = v; else delete sl.n; save(); }
   else if (k === 'fp') { S.sheet.text = el.value; const p = $('#fp-parse'); if (p) p.innerHTML = fpPreview(el.value); }
   else if (k === 'fi-name' || k === 'fi-q') S.sheet[k.slice(3)] = el.value;

@@ -123,7 +123,16 @@ body.en .meal-label{font-size:14.5px}
 .prep-btn{position:relative;display:flex;align-items:center;gap:4px;height:38px;padding:0 13px 0 9px;border-radius:99px;font:400 14px var(--display)}
 .prep-btn .dd{width:22px;height:22px}
 .prep-btn .peek{position:absolute;right:10px;top:-25px;width:46px;height:auto;z-index:3;pointer-events:none}
-.wk-stat{font-size:12.5px;color:var(--pencil);margin:-6px 0 12px}
+.wk-stat{font-size:12.5px;color:var(--pencil);margin:-6px 0 12px;display:flex;align-items:center;gap:8px}
+.wk-stat>span{flex:1;min-width:0}
+/* 사진/이름 보기 전환 (2026-11-08) */
+.vw{flex:none;display:flex;border-radius:99px;padding:2px;height:28px}
+.vw button{border-radius:99px;padding:1px 10px 0;font:400 12px var(--display);color:var(--pencil)}
+.vw button.on{background:var(--ink);color:#fff}
+.cell .top{display:flex;align-items:center;gap:4px;margin-bottom:2px}
+.cell .top .slot,.cell .top .prep{margin:0}
+.cell .chg{align-self:flex-start;font:400 10px var(--display);color:var(--ink);background:var(--wash);border-radius:99px;padding:2px 6px 1px;margin-bottom:2px;white-space:nowrap}
+.cell .top .chg{margin:0}
 .wk-cols,.wk-row{display:grid;grid-template-columns:38px repeat(3,minmax(0,1fr));gap:6px}
 .wk-cols{font:400 12.5px var(--display);color:var(--pencil);text-align:center;margin-bottom:5px}
 .wk-row{min-height:76px;margin-bottom:6px}
