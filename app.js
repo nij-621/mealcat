@@ -1,7 +1,7 @@
 // Mealcat — 주간 식단 계획 + 사진 기록 (서버·AI 없음, 데이터는 이 기기 IndexedDB)
 'use strict';
 // 버전: sw.js의 CACHE와 같이 올림. 0.1씩, v1.9 다음은 v2.0
-const VERSION = '2.2';
+const VERSION = '2.3';
 
 /* ───────── 작은 도구 ───────── */
 const $ = s => document.querySelector(s);
@@ -116,8 +116,15 @@ async function purl(id) {
   const b = await photoGet(id); if (!b) return '';
   const u = URL.createObjectURL(b); urls.set(id, u); return u;
 }
-const pimg = id => `<img data-pid="${esc(id)}" alt="">`;
-function hydrate() { document.querySelectorAll('img[data-pid]:not([src])').forEach(async img => { const u = await purl(img.dataset.pid); if (u) img.src = u; }); }
+// lazy: 지난 기록처럼 사진이 수백 장일 때 화면에 가까워질 때만 불러옴
+const pimg = (id, lazy) => `<img data-pid="${esc(id)}"${lazy ? ' data-lazy' : ''} alt="">`;
+let photoIO;
+function hydrate() {
+  photoIO?.disconnect();
+  const load = async img => { const u = await purl(img.dataset.pid); if (u) img.src = u; };
+  photoIO = 'IntersectionObserver' in window ? new IntersectionObserver((es, o) => es.forEach(e => { if (e.isIntersecting) { o.unobserve(e.target); load(e.target); } }), { rootMargin: '800px 0px' }) : null;
+  document.querySelectorAll('img[data-pid]:not([src])').forEach(img => photoIO && img.hasAttribute('data-lazy') ? photoIO.observe(img) : load(img));
+}
 async function shrink(file, max = 1024) {
   const bmp = await createImageBitmap(file);
   const r = Math.min(1, max / Math.max(bmp.width, bmp.height));
@@ -232,6 +239,8 @@ function relWeek(mon) {
   if (mon === addDays(cur, -7)) return t('지난주', 'Last week');
   return mon < cur ? t('지난 기록', 'Past week') : t('앞으로', 'Upcoming');
 }
+// 사진/이름 보기 전환 — 이번 주 탭과 지난 기록 탭이 같은 설정(state.wkNames)을 씀
+const vwToggle = () => `<div class="vw pen" role="group" aria-label="${t('칸 보기', 'Cell view')}"><button class="${state.wkNames ? '' : 'on'}" data-a="wk-view" data-v="0">${t('사진', 'Photos')}</button><button class="${state.wkNames ? 'on' : ''}" data-a="wk-view" data-v="1">${t('이름', 'Names')}</button></div>`;
 function vWeek() {
   const mon = S.weekOf, w = getWeek(mon, false), today = todayStr();
   let h = `<div class="head">
@@ -241,7 +250,7 @@ function vWeek() {
     <div class="wk-btns"><button class="icon-btn pen" data-a="share-him" aria-label="${t('남편에게 공유', 'Share')}">${ic('i-share')}</button>
       <button class="prep-btn pen" data-a="prep">${ic('daisy')}${t('다음 주 준비', 'Next week')}${art('cat-peek', 'peek')}</button></div></div>
   <div class="wk-stat"><span>${w?.legacy ? t('메모앱에서 옮긴 계획 · ', 'Plan from my notes app · ') : ''}${statLine(mon)}</span>
-    <div class="vw pen" role="group" aria-label="${t('칸 보기', 'Cell view')}"><button class="${state.wkNames ? '' : 'on'}" data-a="wk-view" data-v="0">${t('사진', 'Photos')}</button><button class="${state.wkNames ? 'on' : ''}" data-a="wk-view" data-v="1">${t('이름', 'Names')}</button></div></div>`;
+    ${vwToggle()}</div>`;
   if (!weekStats(mon).plans) {
     const prev = weekStats(addDays(mon, -7)).plans;
     h += `<div class="empty-week pen dash">${art('cat-sleep')}<div><p>${t('칸을 눌러 메뉴를 적어요.', 'Tap a slot to write a dish.')}</p>
@@ -350,14 +359,36 @@ function vHistory() {
   const mons = Object.keys(state.weeks).filter(k => k <= cur && (weekStats(k).plans || weekStats(k).photo)).sort().reverse();
   let h = `<div class="head"><div><div class="lab">${t('지난 기록', 'History')}</div><div class="big">${t(`${mons.length}주`, `${mons.length} weeks`)}</div></div>${art('cat-sit', 'cat')}</div>`;
   if (!mons.length) return h + `<div class="empty-week pen dash">${art('cat-sleep')}<p>${t('한 주를 기록하면 여기에 쌓여요.', 'Weeks you log will pile up here.')}</p></div>`;
+  // 한 주 = 작은 달력(요일 = 열, 끼니 = 행), 달이 바뀌면 위에 붙는 달 머리줄 (2026-11-15, 목업 .grill/meal-planner-history-feed-mockup.html A안)
+  h += `<div class="wk-stat"><span>${t('누르면 그 주로 가요', 'Tap a week to open it')}</span>${vwToggle()}</div>`;
+  const today = todayStr(), thisYear = parse(today).getFullYear();
+  let lastMo = '';
   for (const mon of mons) {
-    const w = state.weeks[mon]; const pics = [];
-    for (const s of weekDays(mon)) { const d = w.days[s]; const sl = d && slotsOf(s).map(k => d.slots[k]).find(x => x?.a?.photo); pics.push(sl ? sl.a.photo : null); }
-    h += `<button class="hist pen" data-a="go-week" data-v="${mon}"><b>${rangeL(mon)} <span class="muted small">${parse(mon).getFullYear()}</span></b><div class="meta">${w.legacy ? t('메모앱 기록', 'From notes app') : statLine(mon)}</div>
-      ${pics.some(Boolean) || !w.legacy ? `<div class="strip">${pics.map(p => `<span>${p ? pimg(p) : ''}</span>`).join('')}</div>`
-        : `<div class="dinners pn">${weekDays(mon).map(s => w.days[s]?.slots.D?.p).filter(Boolean).map(n => esc(m(n))).join(' · ')}</div>`}</button>`;
+    const w = state.weeks[mon], a = parse(mon), mo = `${a.getFullYear()}-${a.getMonth()}`;
+    if (mo !== lastMo) {
+      lastMo = mo;
+      const y = a.getFullYear() === thisYear ? '' : a.getFullYear();
+      h += `<div class="hist-mon">${t(`${y ? y + '년 ' : ''}${a.getMonth() + 1}월`, `${MON_EN[a.getMonth()]}${y ? ' ' + y : ''}`)}</div>`;
+    }
+    h += `<button class="hist pen" data-a="go-week" data-v="${mon}"><b>${rangeL(mon)} <span class="muted small">${a.getFullYear()}</span></b><div class="meta">${w.legacy ? t('메모앱 기록', 'From notes app') : statLine(mon)}</div><div class="mini">`;
+    weekDays(mon).forEach((s, i) => {
+      const d = w.days[s], c = i + 1;
+      h += `<span class="mh${s === today ? ' today' : ''}" style="grid-column:${c}"><b>${dow(s)}</b><small>${parse(s).getDate()}</small></span>`;
+      if (isTwo(s)) h += miniCell(d?.slots.BR, w.legacy, `grid-column:${c};grid-row:2 / span 2`, ' span') + miniCell(d?.slots.D, w.legacy, `grid-column:${c};grid-row:4`);
+      else ['B', 'L', 'D'].forEach((k, r) => h += miniCell(d?.slots[k], w.legacy, `grid-column:${c};grid-row:${r + 2}`));
+    });
+    h += `</div></button>`;
   }
   return h;
+}
+// 지난 기록 작은 칸: 사진 · 이름(기록함) · 점선 연한 이름(계획만) · 점선 "외식" · 점선 빈 칸. 이름 보기면 이름 있는 사진 칸도 글자로
+function miniCell(sl, legacy, pos, span = '') {
+  sl = sl || {};
+  const name = sl.a?.s ? (sl.a.s === 'out' ? OUT : sl.a.m || sl.p) : sl.p || sl.h || '';
+  if (sl.a?.photo && (!state.wkNames || !name)) return `<span class="mc${span}" style="${pos}">${pimg(sl.a.photo, true)}</span>`;
+  if (name === OUT) return `<span class="mc out${span}" style="${pos}">${esc(m(OUT))}</span>`;
+  if (!name) return `<span class="mc none${span}" style="${pos}"></span>`;
+  return `<span class="mc t${!sl.a && !legacy ? ' miss' : ''}${span}" style="${pos}">${esc(m(name))}</span>`;
 }
 
 /* 메뉴·레시피 */

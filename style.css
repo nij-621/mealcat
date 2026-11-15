@@ -243,10 +243,22 @@ textarea.mono{font:13.5px/1.5 var(--body);letter-spacing:0}
 .hist{border-radius:18px;padding:12px;margin-bottom:10px;width:100%;text-align:left;display:block}
 .hist b{font:400 18px var(--display)}
 .hist .meta{margin:2px 0 8px}
-.strip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.strip span{aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--wash)}
-.strip img{width:100%;height:100%;object-fit:cover;display:block}
-.dinners{font-size:16px;line-height:1.35;color:#5d5855;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* 달 머리줄: 스크롤하는 동안 위에 붙음. ::before가 상태 표시줄 자리를 종이색으로 덮음 */
+.hist-mon{position:sticky;top:var(--safe-t);z-index:5;background:var(--paper);font:400 15px var(--display);color:var(--pencil);padding:8px 2px 6px;margin:0 -2px}
+.hist-mon::before{content:"";position:absolute;left:0;right:0;bottom:100%;height:var(--safe-t);background:var(--paper)}
+/* 한 주 = 작은 달력 (요일 = 열, 끼니 = 행; 2끼 날은 브런치가 두 줄) */
+.mini{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:auto repeat(3,minmax(38px,auto));gap:3px}
+.mh{grid-row:1;text-align:center;font:400 12.5px/1 var(--display);padding-bottom:3px}
+.mh b{font-weight:400}
+.mh small{display:block;font:400 10px var(--body);color:var(--pencil);margin-top:2px}
+.mh.today b{background:var(--blush);border-radius:99px;padding:0 5px}
+.mc{display:block;border-radius:8px;overflow:hidden;background:var(--wash);min-width:0;aspect-ratio:1}
+.mc.span{aspect-ratio:auto}
+.mc img{width:100%;height:100%;object-fit:cover;display:block}
+.mc.t{padding:3px 3px 2px;font:700 12px/1 var(--pen);letter-spacing:var(--pen-track);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.mc.span.t{-webkit-line-clamp:6}
+.mc.miss,.mc.none{background:none;color:var(--pencil);border:1.2px dashed var(--line)}
+.mc.out{background:none;border:1.2px dashed var(--pencil);color:var(--pencil);display:flex;align-items:center;justify-content:center;font:400 10.5px var(--display)}
 
 /* ── 메뉴·레시피 ── */
 .seg.top{margin:0 0 12px}
