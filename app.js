@@ -1,7 +1,7 @@
 // Mealcat — 주간 식단 계획 + 사진 기록 (서버·AI 없음, 데이터는 이 기기 IndexedDB)
 'use strict';
 // 버전: sw.js의 CACHE와 같이 올림. 0.1씩, v1.9 다음은 v2.0
-const VERSION = '2.3';
+const VERSION = '2.4';
 
 /* ───────── 작은 도구 ───────── */
 const $ = s => document.querySelector(s);
@@ -260,11 +260,11 @@ function vWeek() {
   for (const s of weekDays(mon)) {
     const d = w?.days[s]; const sn = d?.snacks?.length || 0;
     const dayIn = `<b>${dow(s)}</b><small>${parse(s).getDate()}</small>${d?.two ? `<small class="two">${t('2끼', '2 meals')}</small>` : ''}${sn ? `<small class="sn">${ic('cookie')}${sn}</small>` : ''}`;
-    h += `<div class="wk-row${s === today ? ' today' : ''}">${isWeekend(s) ? `<div class="wk-day">${dayIn}</div>` : `<button class="wk-day" data-a="two" data-v="${s}" aria-label="${dowL(s)} · ${d?.two ? t('3끼로 돌리기', 'Back to 3 meals') : t('2끼 날로 바꾸기', 'Make it a 2-meal day')}">${dayIn}</button>`}`;
+    h += `<div class="wk-row${s === today ? ' today' : ''}">${isWeekend(s) ? `<button class="wk-day" data-a="goto-day" data-v="${s}" aria-label="${dowL(s)} · ${t('이 날 보기', 'Open this day')}">${dayIn}</button>` : `<button class="wk-day" data-a="day-menu" data-v="${s}" aria-label="${dowL(s)}">${dayIn}</button>`}`;
     for (const k of slotsOf(s)) h += cell(s, k, d?.slots[k], s < today && !w?.legacy);
     h += `</div>`;
   }
-  h += `<div class="wk-hint">${t('평일 요일을 누르면 2끼 날(브런치·저녁)로 바뀌어요', 'Tap a weekday to make it a 2-meal day (brunch + dinner)')}</div>`;
+  h += `<div class="wk-hint">${t('요일을 누르면 그날 보기 · 평일은 2끼 날(브런치·저녁)로도 바꿀 수 있어요', 'Tap a day to open it · weekdays can also become 2-meal days (brunch + dinner)')}</div>`;
   if (w?.preps.length) h += `<div class="mp pen"><b>${t('밀프랩', 'Meal prep')}</b><span>${w.preps.map(p => `${prepL(p.type)} ${esc(m(p.name))} ${Math.max(0, prepLeft(w, p.id))}/${p.count}`).join(' · ')}</span></div>`;
   if (w && mon < mondayOf(today)) h += `<div class="wk-del"><button class="ghost pen" data-a="week-del" data-v="${mon}">${ic('i-x')}${t('이 주 기록 지우기', 'Delete this week')}</button></div>`;
   return h;
@@ -569,6 +569,13 @@ function shSnack() {
   <div class="two" style="margin-top:12px"><button class="ghost pen" data-a="snack-del">${ic('i-x')}${t('지우기', 'Remove')}</button><button class="solid" style="height:44px" data-a="snack-save">${t('저장', 'Save')}</button></div>`;
 }
 
+/* 이번 주 탭 평일 요일 */
+function shDay() {
+  const s = S.sheet.date, two = getDay(s, false)?.two;
+  return `<div class="sh-top"><div><b>${dowL(s)}</b><p>${dateL(s)}</p></div>${xBtn()}</div>
+  <div class="two" style="margin-top:12px"><button class="ghost pen" data-a="day-two" data-v="${s}">${ic('i-swap')}${two ? t('3끼로 돌리기', 'Back to 3 meals') : t('2끼 날로', '2-meal day')}</button><button class="solid" style="height:44px" data-a="goto-day" data-v="${s}">${t('이 날 보기', 'Open this day')}</button></div>`;
+}
+
 /* ───────── 시트 ───────── */
 function openSheet(sheet) { S.sheet = sheet; renderSheet(true); }
 function closeSheet() {
@@ -578,7 +585,7 @@ function closeSheet() {
   setTimeout(() => { if (!S.sheet) $('#sheet-root').innerHTML = ''; }, 300);
 }
 function renderSheet(fresh) {
-  const root = $('#sheet-root'); const html = { pick: shPick, recipe: shRecipe, radd: shRecipeAdd, settings: shSettings, ask: shAsk, fpaste: shFridgePaste, fitem: shFitem, photo: shPhoto, snack: shSnack }[S.sheet.type]();
+  const root = $('#sheet-root'); const html = { pick: shPick, recipe: shRecipe, radd: shRecipeAdd, settings: shSettings, ask: shAsk, fpaste: shFridgePaste, fitem: shFitem, photo: shPhoto, snack: shSnack, day: shDay }[S.sheet.type]();
   let sh = $('.sheet');
   if (fresh || !sh) {
     root.innerHTML = `<div class="dim" data-a="close"></div><div class="sheet" role="dialog" aria-modal="true"><div class="in-w"></div></div>`;
@@ -822,6 +829,8 @@ const A = {
   prep: () => { S.sub = 'prep'; scrollTo(0, 0); render(); },
   'go-week': v => { S.tab = 'week'; S.sub = 'grid'; S.weekOf = v; scrollTo(0, 0); render(); },
   'goto-day': v => { closeSheet(); S.tab = 'today'; S.day = v; scrollTo(0, 0); render(); },
+  'day-menu': v => openSheet({ type: 'day', date: v }),
+  'day-two': v => { closeSheet(); A.two(v); },
   'wk-view': v => { state.wkNames = v === '1'; save(); render(); },
   mt: v => { S.mt = v; render(); },
   rf: v => { S.rf = v; render(); },
